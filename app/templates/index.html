@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Startseite</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<h1>Designprozess-Analyse</h1>
+
+<p class="info-text">
+    Laden Sie ihre Excel-Datei hoch.
+</p>
+
+<div class="center-content">
+    <button class="btn">Excel-Datei hochladen</button>
+</div>
+
+<p class="info-text">
+    Anschließend wählen Sie eine Analyse aus, um Ihren Designprozess statistisch auszuwerten.
+</p>
+
+<div class="button-row">
+    <button class="btn" onclick="location.href='/correspondence_analysis'">Correspondence Analysis</button>
+    <button class="btn" onclick="location.href='/cumulative_occurence_analysis'">Cumulative Occurrence Analysis</button>
+    <button class="btn" onclick="location.href='/markov_chain_analysis'">Markov Chain Analysis</button>
+</div>
+
+</body>
+</html>
