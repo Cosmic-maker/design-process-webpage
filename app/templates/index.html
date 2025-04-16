@@ -8,13 +8,16 @@
 </head>
 <body>
 <h1>Designprozess-Analyse</h1>
-
-<p class="info-text">
-    Laden Sie ihre Excel-Datei hoch.
-</p>
-
 <div class="center-content">
-    <button class="btn">Excel-Datei hochladen</button>
+    <label class="info-text">Laden Sie Ihre Excel-Dateien hoch (1 Datei pro Designprozess):</label>
+</div>
+<div class="center-content">
+    <form method="POST" action="/upload" enctype="multipart/form-data" class="upload-form">
+        <input type="file" name="files" multiple accept=".xlsx" required>
+        <br><br><br>
+        <button type="submit" class="btn">Dateien hochladen</button>
+    </form>
+
 </div>
 
 <p class="info-text">
