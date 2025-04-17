@@ -1,61 +1,87 @@
-from flask import render_template, request, redirect, flash
 import os
 from werkzeug.utils import secure_filename
+from flask import render_template, request, redirect, flash, send_file
+from app.logic import process_excel_file, create_combined_excel
 
-from app.logic import process_excel_file
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
-UPLOAD_FOLDER = "uploads"  # Ordner für Uploads
-ALLOWED_EXTENSIONS = {'xlsx'}  # Nur Excel-Dateien erlaubt
+# Konfiguration
+ALLOWED_EXTENSIONS = {'xlsx'}
+UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")  # ABSOLUTER Pfad
+COMBINED_FILENAME = os.path.join(UPLOAD_FOLDER, "combined_output.xlsx")  # ABSOLUTER Pfad
 
-# Funktion zur Überprüfung der Dateiendung
+# Sicherstellen, dass das Verzeichnis existiert
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 def setup_routes(app):
     app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-    os.makedirs(UPLOAD_FOLDER, exist_ok=True)  # Ordner für Uploads erstellen, falls nicht vorhanden
 
     @app.route("/")
     def index():
-        return render_template("index.html")
+        # Prüfen, ob die kombinierte Datei existiert
+        combined_file_exists = os.path.exists(COMBINED_FILENAME)
+        return render_template("index.html", combined_file_exists=combined_file_exists)
 
-    @app.route("/correspondence_analysis")
-    def correspondence_analysis():
-        return render_template("correspondence_analysis.html")
-
-    @app.route('/cumulative_occurence_analysis')
-    def cumulative_occurence_analysis():
-        return render_template("cumulative_occurence_analysis.html")
-
-    @app.route("/markov_chain_analysis")
-    def markov_chain_analysis():
-        return render_template("markov_chain_analysis.html")
-
-    # Route für das Hochladen der Excel-Dateien
     @app.route("/upload", methods=["POST"])
     def upload():
         files = request.files.getlist("files")
-
-        # Überprüfen, ob Dateien vorhanden sind
         if not files or files[0].filename == "":
-            flash("Keine Dateien hochgeladen.")
+            flash("❌ Keine Dateien hochgeladen.")
             return redirect("/")
 
+        valid_sheets = {}  # Hier speichern wir die verarbeiteten Sheets
+
         for file in files:
-            if file and allowed_file(file.filename):  # Überprüfen, ob Datei eine erlaubte Excel-Datei ist
+            if file and allowed_file(file.filename):
                 filename = secure_filename(file.filename)
                 filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-                file.save(filepath)  # Speichern der Datei auf dem Server
+                file.save(filepath)
+                print(f"📥 Datei gespeichert unter: {filepath}")
 
                 try:
-                    # Verarbeite die Datei mit der Logik-Funktion und speichere das Diagramm
-                    process_excel_file(filepath)
-                    flash(f"Die Datei {filename} wurde hochgeladen.")
-                except ValueError as e:
-                    flash(f"Fehler bei der Verarbeitung der Datei {filename}: {e}")
-                except Exception as e:
-                    flash(f"Unerwarteter Fehler bei der Verarbeitung der Datei {filename}: {e}")
-            else:
-                flash(f"{file.filename} ist keine gültige Excel-Datei. Bitte eine .xlsx-Datei hochladen.")
+                    sheet_dfs = process_excel_file(filepath)
 
-        return redirect("/")  # Nach dem Upload zurück zur Startseite
+                    for name, df in sheet_dfs:
+                        original_name = name
+                        i = 1
+                        while name in valid_sheets:
+                            name = f"{original_name}_{i}"
+                            i += 1
+                        valid_sheets[name] = df
+
+                    flash(f"✅ Datei {filename} wurde erfolgreich verarbeitet.")
+                except ValueError as e:
+                    flash(f"❌ Fehler bei {filename}: {e}")
+                except Exception as e:
+                    flash(f"❌ Unerwarteter Fehler bei {filename}: {e}")
+            else:
+                flash(f"❌ {file.filename} ist keine gültige Excel-Datei.")
+
+        if valid_sheets:
+            print(f"📁 Erstelle kombinierte Datei: {COMBINED_FILENAME}")
+            create_combined_excel(valid_sheets, COMBINED_FILENAME)
+            flash("📄 Kombinierte Excel-Datei wurde erstellt: combined_output.xlsx")
+
+        return redirect("/")
+
+    @app.route("/download_combined_file")
+    def download_combined():
+        if not os.path.exists(COMBINED_FILENAME):
+            print("❌ Datei existiert nicht!")
+            flash("❌ Kombinierte Datei nicht gefunden.")
+            return redirect("/")
+
+        try:
+            return send_file(
+                COMBINED_FILENAME,
+                as_attachment=True,
+                download_name=f"kombinierte_designprozesse.xlsx",
+                mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            )
+        except Exception as e:
+            print(f"❌ Download-Fehler: {str(e)}")
+            flash(f"❌ Fehler beim Download: {str(e)}")
+            return redirect("/")
