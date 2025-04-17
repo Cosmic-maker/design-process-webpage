@@ -1,18 +1,19 @@
 from flask import render_template, request, redirect, flash
-import pandas as pd
 import os
 from werkzeug.utils import secure_filename
 
-UPLOAD_FOLDER = "uploads" # folder for uploads
-ALLOWED_EXTENSIONS = {'xlsx'} # only excel
+from app.logic import process_excel_file
 
-# function to check the extension
+UPLOAD_FOLDER = "uploads"  # Ordner für Uploads
+ALLOWED_EXTENSIONS = {'xlsx'}  # Nur Excel-Dateien erlaubt
+
+# Funktion zur Überprüfung der Dateiendung
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 def setup_routes(app):
-    app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER # set folder on app configuration
-    os.makedirs(UPLOAD_FOLDER, exist_ok=True)  # creating folder if it does not exist
+    app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+    os.makedirs(UPLOAD_FOLDER, exist_ok=True)  # Ordner für Uploads erstellen, falls nicht vorhanden
 
     @app.route("/")
     def index():
@@ -30,42 +31,31 @@ def setup_routes(app):
     def markov_chain_analysis():
         return render_template("markov_chain_analysis.html")
 
-    # route for upload just POST requests
+    # Route für das Hochladen der Excel-Dateien
     @app.route("/upload", methods=["POST"])
     def upload():
-        # get the files
         files = request.files.getlist("files")
-        # if no files
-        if not files:
+
+        # Überprüfen, ob Dateien vorhanden sind
+        if not files or files[0].filename == "":
             flash("Keine Dateien hochgeladen.")
-            return redirect("/") # back to starting page
-        # going through files
+            return redirect("/")
+
         for file in files:
-            if file and allowed_file(file.filename):
+            if file and allowed_file(file.filename):  # Überprüfen, ob Datei eine erlaubte Excel-Datei ist
                 filename = secure_filename(file.filename)
                 filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-                # save file on server
-                file.save(filepath)
-                # processing file
-                process_excel_file(filepath) # method call
+                file.save(filepath)  # Speichern der Datei auf dem Server
+
+                try:
+                    # Verarbeite die Datei mit der Logik-Funktion und speichere das Diagramm
+                    process_excel_file(filepath)
+                    flash(f"Die Datei {filename} wurde hochgeladen.")
+                except ValueError as e:
+                    flash(f"Fehler bei der Verarbeitung der Datei {filename}: {e}")
+                except Exception as e:
+                    flash(f"Unerwarteter Fehler bei der Verarbeitung der Datei {filename}: {e}")
             else:
-                flash(f"{file.filename} ist keine gültige Excel-Datei.")
+                flash(f"{file.filename} ist keine gültige Excel-Datei. Bitte eine .xlsx-Datei hochladen.")
 
-        flash("Dateien erfolgreich hochgeladen und verarbeitet.")
-        return redirect("/")
-
-# processing files
-def process_excel_file(filepath):
-    # open with pandas
-    xls = pd.ExcelFile(filepath)
-    print(f" Verarbeite Datei: {filepath}")
-    # go through all tables
-    for sheet_name in xls.sheet_names:
-        df = xls.parse(sheet_name) # load current sheet as dataframe
-        # checking format of columns
-        if list(df.columns[:2]) != ["Segment", "Code"]:
-            print(f" Fehler: Tab '{sheet_name}' hat falsche Spalten in Datei {filepath}")
-            continue # next sheet
-
-        print(f"✅ Tab '{sheet_name}' OK in Datei {filepath}")
-        print(df.head())
+        return redirect("/")  # Nach dem Upload zurück zur Startseite

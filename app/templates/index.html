@@ -8,6 +8,17 @@
 </head>
 <body>
 <h1>Designprozess-Analyse</h1>
+
+{% with messages = get_flashed_messages() %}
+{% if messages %}
+<div class="flash-messages">
+    {% for message in messages %}
+    <p class="flash-message">{{ message }}</p>
+    {% endfor %}
+</div>
+{% endif %}
+{% endwith %}
+
 <div class="center-content">
     <label class="info-text">Laden Sie Ihre Excel-Dateien hoch (1 Datei pro Designprozess):</label>
 </div>
@@ -17,11 +28,10 @@
         <br><br><br>
         <button type="submit" class="btn">Dateien hochladen</button>
     </form>
-
 </div>
 
 <p class="info-text">
-    Anschließend wählen Sie eine Analyse aus, um Ihren Designprozess statistisch auszuwerten.
+    Nach erfolgreichem Upload wählen Sie unten eine Analyseart aus.
 </p>
 
 <div class="button-row">
