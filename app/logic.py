@@ -7,35 +7,47 @@ ALLOWED_CODES = {"R", "F", "Be", "Bs", "S", "D"}
 DIAGRAM_FOLDER = "diagramme"
 os.makedirs(DIAGRAM_FOLDER, exist_ok=True)
 
-# Methode zum Überprüfen des Formats und der Werte der Excel-Datei
 def process_excel_file(filepath):
     xls = pd.ExcelFile(filepath)
     filename_base = os.path.splitext(os.path.basename(filepath))[0]
 
+    valid_sheets = []
+
     for sheet_name in xls.sheet_names:
         df = xls.parse(sheet_name)
 
-        # ✅ 1. Spaltennamen prüfen
         if list(df.columns[:2]) != ["Segment", "Code"]:
-            raise ValueError(f"❌ Fehler in '{sheet_name}': Spalten müssen 'Segment' und 'Code' heißen.")
+            raise ValueError(f"Tab '{sheet_name}': Spalten müssen 'Segment' und 'Code' heißen.")
 
-        # ✅ 2. Datentypen prüfen
         if not pd.api.types.is_integer_dtype(df["Segment"]):
-            raise ValueError(f"❌ Fehler in '{sheet_name}': 'Segment' muss aus ganzen Zahlen bestehen.")
+            raise ValueError(f"Tab '{sheet_name}': 'Segment' muss aus ganzen Zahlen bestehen.")
 
         if not all(code in ALLOWED_CODES for code in df["Code"].astype(str)):
-            raise ValueError(f"❌ Fehler in '{sheet_name}': 'Code' enthält ungültige Werte.")
+            raise ValueError(f"Tab '{sheet_name}': 'Code' enthält ungültige Werte.")
 
-        # ✅ 3. Fortlaufende Segmentnummern (optional, aber empfohlen)
         expected_segments = list(range(1, len(df) + 1))
         if not df["Segment"].tolist() == expected_segments:
-            raise ValueError(f"❌ Fehler in '{sheet_name}': 'Segment' muss von 1 bis n durchnummeriert sein.")
+            raise ValueError(f"Tab '{sheet_name}': 'Segment' muss von 1 bis n durchnummeriert sein.")
 
-        print(f"✅ Datenformat OK in Tab: {sheet_name}")
+        # ✅ Append als Liste von Tupeln
+        valid_sheets.append((filename_base, df))
 
-        # Hier wird nur das Format überprüft und keine Analyse durchgeführt.
-        # Die Analyse erfolgt in der neuen Methode.
-    return filename_base
+    return valid_sheets
+
+def create_combined_excel(sheet_dict, output_path):
+    # Check if the directory exists, if not create it
+    output_dir = os.path.dirname(output_path)
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    # Check if the file exists or not
+    file_exists = os.path.exists(output_path)
+
+    # Open the Excel file (write mode if new, append mode if existing)
+    with pd.ExcelWriter(output_path, engine='openpyxl', mode='a' if file_exists else 'w') as writer:
+        for sheet_name, df in sheet_dict.items():
+            df.to_excel(writer, sheet_name=sheet_name, index=False)
+
 
 #Korrespondenzanalyse wird noch nicht verwendet
 def perform_correspondence_analysis(df, sheet_name, filename_base):

@@ -22,6 +22,7 @@
 <div class="center-content">
     <label class="info-text">Laden Sie Ihre Excel-Dateien hoch (1 Datei pro Designprozess):</label>
 </div>
+
 <div class="center-content">
     <form method="POST" action="/upload" enctype="multipart/form-data" class="upload-form">
         <input type="file" name="files" multiple accept=".xlsx" required>
@@ -29,6 +30,12 @@
         <button type="submit" class="btn">Dateien hochladen</button>
     </form>
 </div>
+
+{% if combined_file_exists %}
+<div class="button-row">
+    <a href="/download_combined_file" class="btn">Kombinierte Datei herunterladen</a>
+</div>
+{% endif %}
 
 <p class="info-text">
     Nach erfolgreichem Upload wählen Sie unten eine Analyseart aus.
