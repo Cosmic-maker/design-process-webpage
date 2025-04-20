@@ -1,7 +1,9 @@
 import os
+
+import pandas as pd
 from werkzeug.utils import secure_filename
 from flask import render_template, request, redirect, flash, send_file
-from app.logic import process_excel_file, create_combined_excel
+from app.logic import process_excel_file, create_combined_excel, perform_markov_chain_analysis
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
@@ -85,3 +87,24 @@ def setup_routes(app):
             print(f"❌ Download-Fehler: {str(e)}")
             flash(f"❌ Fehler beim Download: {str(e)}")
             return redirect("/")
+
+    @app.route("/markov_chain_analysis")
+    def generate_markov():
+        if not os.path.exists(COMBINED_FILENAME):
+            flash("❌ Kombinierte Datei nicht gefunden.")
+            return redirect("/")
+
+        try:
+            # read excel file
+            xls = pd.ExcelFile(COMBINED_FILENAME)
+
+            for sheet_name in xls.sheet_names:
+                df = xls.parse(sheet_name)
+                perform_markov_chain_analysis(df, sheet_name=sheet_name, filename_base="combined_output")
+
+            flash("📊 Markov-Diagramme erfolgreich erstellt.")
+        except Exception as e:
+            print(f"❌ Fehler bei der Markov-Analyse: {str(e)}")
+            flash(f"❌ Fehler bei der Markov-Analyse: {str(e)}")
+
+        return redirect("/")

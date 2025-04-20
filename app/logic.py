@@ -1,7 +1,9 @@
+import networkx as nx
 import pandas as pd
 import matplotlib.pyplot as plt
 import prince
 import os
+
 
 ALLOWED_CODES = {"R", "F", "Be", "Bs", "S", "D"}
 DIAGRAM_FOLDER = "diagramme"
@@ -83,3 +85,68 @@ def perform_correspondence_analysis(df, sheet_name, filename_base):
     plt.close()
 
     print(f"📊 Diagramm gespeichert: {output_path}")
+
+
+def perform_markov_chain_analysis(df, sheet_name, filename_base):
+    # Codes extrahieren (hier als Beispiel)
+    codes = df["Code"].astype(str).tolist()
+    transitions = list(zip(codes[:-1], codes[1:]))
+
+    # Übergangshäufigkeit berechnen
+    transition_counts = {from_code: {to_code: 0 for to_code in ALLOWED_CODES} for from_code in ALLOWED_CODES}
+    for from_code, to_code in transitions:
+        if from_code in ALLOWED_CODES and to_code in ALLOWED_CODES:
+            transition_counts[from_code][to_code] += 1
+
+    # Wahrscheinlichkeiten berechnen
+    transition_probs = {from_code: {to_code: 0 for to_code in ALLOWED_CODES} for from_code in ALLOWED_CODES}
+    for from_code in ALLOWED_CODES:
+        total_transitions = sum(transition_counts[from_code].values())
+        for to_code in ALLOWED_CODES:
+            if total_transitions > 0:
+                transition_probs[from_code][to_code] = transition_counts[from_code][to_code] / total_transitions
+
+    G = nx.DiGraph()
+
+    for code in ALLOWED_CODES:
+        G.add_node(code, size=1000)
+
+
+    for from_code in ALLOWED_CODES:
+        for to_code in ALLOWED_CODES:
+            prob = transition_probs[from_code][to_code]
+            if prob > 0:
+                G.add_edge(from_code, to_code, weight=prob)
+
+    plt.figure(figsize=(8, 8))
+    pos = nx.spring_layout(G, seed=42)
+    nx.draw_networkx_nodes(G, pos, node_size=3000, node_color='skyblue', edgecolors="black", alpha=0.7)
+
+    edges = G.edges()
+    weights = [G[u][v]["weight"] for u, v in edges]
+    nx.draw_networkx_edges(
+        G,
+        pos,
+        edgelist=edges,
+        width=[weight * 10 for weight in weights],
+        alpha=0.7,
+        edge_color='grey',
+        arrows=True,
+        arrowstyle='-|>',
+        min_source_margin=25,
+        min_target_margin=25,
+        connectionstyle='arc3,rad=0.1'
+    )
+    nx.draw_networkx_labels(G, pos, font_size=14, font_weight='bold', font_color='black')
+
+    plt.title(f"Markov Chain Analysis: {sheet_name}")
+
+    diagram_folder = os.path.join(os.getcwd(), 'app', 'diagrams')
+    os.makedirs(diagram_folder, exist_ok=True)
+    output_path = os.path.join(diagram_folder, f"{sheet_name}_markov.png")
+
+    plt.tight_layout()
+    plt.savefig(output_path)
+    plt.close()
+
+    print(f"🔁 Markov-Diagramm gespeichert: {output_path}")
