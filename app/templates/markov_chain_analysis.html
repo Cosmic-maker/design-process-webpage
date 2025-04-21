@@ -1,23 +1,36 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="de">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Markov Chain Analysis</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-
 <h1>Markov Chain Analysis</h1>
-
-{% if error_message %}
-<p class="error">{{ error_message }}</p>
-{% else %}
-<h2>Markov Chain Diagramm:</h2>
-<img src="{{ url_for('serve_diagram', filename='markov_diagram.png') }}" alt="Markov Diagram">
-{% endif %}
-
+<form method="POST" action="/markov_analysis">
+    <label for="register">      Wählen Sie ein Register:</label>
+    <select name="register" id="register">
+        {% if registers %}
+        {% for register in registers %}
+        <option value="{{ register }}">{{ register }}</option>
+        {% endfor %}
+        {% else %}
+        <option disabled>Keine Register verfügbar</option>
+        {% endif %}
+    </select>
+    <br>
+    <br>
+    <button type="submit" style="margin-left: 20px;">Erzeugen</button>
+</form>
 <div class="center-content">
-    <button class="btn">Zurück zur Startseite</button>
+    {% if selected_register %}
+    <h2>Markov-Diagramm: </h2>
+    <br>
+    <br>
+    <img src="{{ url_for('static', filename='diagrams/' + selected_register + '_markov.png') }}" alt="Markov Diagramm">
+    {% endif %}
+    <br>
 </div>
 
 </body>

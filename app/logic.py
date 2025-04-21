@@ -6,7 +6,7 @@ import os
 
 
 ALLOWED_CODES = {"R", "F", "Be", "Bs", "S", "D"}
-DIAGRAM_FOLDER = "diagramme"
+DIAGRAM_FOLDER = os.path.join("app", "static", "diagrams")
 os.makedirs(DIAGRAM_FOLDER, exist_ok=True)
 
 def process_excel_file(filepath):
@@ -141,9 +141,9 @@ def perform_markov_chain_analysis(df, sheet_name, filename_base):
 
     plt.title(f"Markov Chain Analysis: {sheet_name}")
 
-    diagram_folder = os.path.join(os.getcwd(), 'app', 'diagrams')
-    os.makedirs(diagram_folder, exist_ok=True)
-    output_path = os.path.join(diagram_folder, f"{sheet_name}_markov.png")
+    DIAGRAM_FOLDER = os.path.join(os.getcwd(), 'app', 'static', "diagrams")
+    os.makedirs(DIAGRAM_FOLDER, exist_ok=True)
+    output_path = os.path.join(DIAGRAM_FOLDER, f"{sheet_name}_markov.png")
 
     plt.tight_layout()
     plt.savefig(output_path)
