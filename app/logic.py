@@ -1,4 +1,5 @@
 import networkx as nx
+import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import prince
@@ -85,6 +86,80 @@ def perform_correspondence_analysis(df, sheet_name, filename_base):
     plt.close()
 
     print(f"📊 Diagramm gespeichert: {output_path}")
+
+
+def perform_cumulative_occurence_analysis(df, sheet_name, filename_base, min_occurrences, fbs_threshold):
+
+    diagram_folder = os.path.join("app", "static", "diagrams", "cumulative_occurrence_analysis")
+    os.makedirs(diagram_folder, exist_ok=True)
+
+    df["Count"] = 1
+    cumulative = df.groupby(["Code", "Segment"]).count().groupby(level=0).cumsum().reset_index()
+
+    slopes = {}
+    curvatures = {}
+    fbs_results = {}
+
+    designprozess_name = sheet_name
+    all_codes = ["R", "F", "Be", "Bs", "S", "D"]
+
+    # Initialisiere FBS-Ergebnisse für diesen Designprozess
+    fbs_results[designprozess_name] = {}
+
+    for code in all_codes:
+        group = cumulative[cumulative["Code"] == code]
+
+        if not group.empty:
+            # FBS unabhängig von min_occurrences
+            first_occurrence_segment = group["Segment"].min()
+            fbs_results[designprozess_name][code] = "Yes" if first_occurrence_segment <= fbs_threshold else "No"
+        else:
+            fbs_results[designprozess_name][code] = "No"
+
+        # Nur wenn genug Daten vorhanden sind, Regression berechnen
+        if len(group) >= min_occurrences:
+            x = group["Segment"]
+            y = group["Count"]
+
+            # Lineare Regression
+            slope, _ = np.polyfit(x, y, deg=1)
+            slopes[code] = slope
+
+            # Quadratische Regression
+            a, b, c = np.polyfit(x, y, deg=2)
+            curvature_type = "linear" if abs(a) < 0.01 else ("convex" if a > 0 else "concave")
+            curvatures[code] = curvature_type
+
+    # Plot 1: Cumulative Occurrence
+    plt.figure(figsize=(8, 6))
+    for code in slopes.keys():
+        group = cumulative[cumulative["Code"] == code]
+        plt.plot(group["Segment"], group["Count"].cumsum(), label=f"{code} ({curvatures.get(code)})")
+    plt.title(f"Cumulative Occurrence Analysis: {sheet_name}")
+    plt.xlabel("Segment")
+    plt.ylabel("Kumulative Häufigkeit")
+    plt.legend(title="Code")
+    plt.grid(axis='y')
+    cumulative_plot_path = os.path.join(diagram_folder, f"{filename_base}_{sheet_name}_cumulative.png")
+    plt.tight_layout()
+    plt.savefig(cumulative_plot_path)
+    plt.close()
+
+    # Plot 2: Slopes
+    plt.figure(figsize=(8, 6))
+    codes = list(slopes.keys())
+    values = [slopes[code] for code in codes]
+    plt.bar(codes, values, color='lightgreen', edgecolor='black')
+    plt.title(f"Slope Analysis: {sheet_name}")
+    plt.xlabel("Code")
+    plt.ylabel("Steigung")
+    plt.grid(axis='y')
+    slope_plot_path = os.path.join(diagram_folder, f"{filename_base}_{sheet_name}_slopes.png")
+    plt.tight_layout()
+    plt.savefig(slope_plot_path)
+    plt.close()
+
+    return fbs_results
 
 
 def perform_markov_chain_analysis(df, sheet_name, filename_base):

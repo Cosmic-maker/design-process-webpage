@@ -1,10 +1,72 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="de">
 <head>
     <meta charset="UTF-8">
-    <title>Cumulative Occurence Analysis</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cumulative Occurrence Analysis</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
+<h1>Cumulative Occurrence Analysis</h1>
 
+<form method="POST" action="/cumulative_occurence_analysis">
+    <label for="register">Wählen Sie ein Register:</label>
+    <select name="register" id="register">
+        {% if registers %}
+        {% for register in registers %}
+        <option value="{{ register }}">{{ register }}</option>
+        {% endfor %}
+        {% else %}
+        <option disabled>Keine Register verfügbar</option>
+        {% endif %}
+    </select>
+    <br><br>
+
+    <label for="threshold">Schwelle für First Occurrence (Segment):</label>
+    <input type="number" name="threshold" id="threshold" value="5" min="1">
+    <br><br>
+
+    <button type="submit" style="margin-left: 20px;">Erzeugen</button>
+</form>
+
+<div class="center-content">
+    {% if image_filenames %}
+    <h2>Erzeugte Diagramme für "{{ selected_register }}":</h2>
+    {% for image in image_filenames %}
+    <div style="margin-bottom: 20px;">
+        <img src="{{ url_for('static', filename='diagrams/cumulative_occurrence_analysis/' + image) }}"
+             alt="{{ image }}" style="max-width: 90%; border: 1px solid #ccc; padding: 10px;">
+        <p style="text-align: center;">{{ image }}</p>
+    </div>
+    {% endfor %}
+    {% else %}
+    {% if selected_register %}
+    <p>Keine Diagramme gefunden für {{ selected_register }}.</p>
+    {% endif %}
+    {% endif %}
+</div>
+{% if fbs_results %}
+<h3>First Occurrence at Start (FBS) Ergebnisse:</h3>
+<table border="1">
+    <thead>
+    <tr>
+        <th>Designprozess</th>
+        {% for code in fbs_results.values()|first %}
+        <th>{{ code }}</th>
+        {% endfor %}
+    </tr>
+    </thead>
+    <tbody>
+    {% for prozess, code_results in fbs_results.items() %}
+    <tr>
+        <td>{{ prozess }}</td>
+        {% for result in code_results.values() %}
+        <td>{{ result }}</td>
+        {% endfor %}
+    </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endif %}
 </body>
 </html>

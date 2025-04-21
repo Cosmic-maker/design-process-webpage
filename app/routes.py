@@ -3,7 +3,7 @@ import os
 import pandas as pd
 from werkzeug.utils import secure_filename
 from flask import render_template, request, redirect, flash, send_file, current_app
-from app.logic import process_excel_file, create_combined_excel, perform_markov_chain_analysis
+from app.logic import process_excel_file, create_combined_excel, perform_cumulative_occurence_analysis, perform_markov_chain_analysis
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
@@ -88,6 +88,49 @@ def setup_routes(app):
             flash(f"❌ Fehler beim Download: {str(e)}")
             return redirect("/")
 
+    @app.route('/cumulative_occurence_analysis', methods=["GET", "POST"])
+    def cumulative_occurence_analysis():
+        uploads_dir = app.config['UPLOAD_FOLDER']
+
+        # Excel-Dateien auflisten
+        if os.path.exists(uploads_dir):
+            registers = [f for f in os.listdir(uploads_dir) if f.endswith('.xlsx')]
+            print(f"Gefundene Register für Cumulative Analysis: {registers}")
+        else:
+            registers = []
+            print(f"❌ Das Verzeichnis {uploads_dir} existiert nicht.")
+
+        selected_register = None
+        image_filenames = []
+        fbs_results = {}
+
+        # Analyse ausführen, falls Button gedrückt wurde
+        if request.method == "POST":
+            selected_register = request.form.get("register")
+            fbs_threshold = int(request.form.get("threshold", 5))  # Schwelle aus dem Formular
+
+            if selected_register:
+                selected_file = os.path.join(uploads_dir, selected_register)
+                try:
+                    df = pd.read_excel(selected_file)
+                    filename_base = os.path.splitext(selected_register)[0]
+                    fbs_results = perform_cumulative_occurence_analysis(df, filename_base, filename_base, min_occurrences=5, fbs_threshold=fbs_threshold)
+                    flash(f"✅ Cumulative Occurrence Analysis für {selected_register} erfolgreich durchgeführt.")
+                    diagram_folder = os.path.join(app.static_folder, 'diagrams', 'cumulative_occurrence_analysis')
+                    image_filenames = [
+                        f for f in os.listdir(diagram_folder)
+                        if f.startswith(filename_base) and f.endswith('.png')
+                    ]
+                except Exception as e:
+                    flash(f"❌ Fehler bei der Analyse der Datei: {str(e)}")
+            else:
+                flash("❌ Kein Register ausgewählt.")
+
+        return render_template("cumulative_occurence_analysis.html",
+                               selected_register=selected_register,
+                               registers=registers,
+                               image_filenames=image_filenames,
+                               fbs_results=fbs_results)
 
     @app.route('/markov_analysis', methods=["GET", "POST"])
     def markov_analysis():
