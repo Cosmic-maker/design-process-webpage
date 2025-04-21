@@ -87,9 +87,7 @@ def perform_correspondence_analysis(df, sheet_name, filename_base):
 
     print(f"📊 Diagramm gespeichert: {output_path}")
 
-
-def perform_cumulative_occurence_analysis(df, sheet_name, filename_base, min_occurrences, fbs_threshold):
-
+def perform_cumulative_occurence_analysis(df, sheet_name, filename_base, min_occurrences_char, min_occurrences_slope, fbs_threshold):
     diagram_folder = os.path.join("app", "static", "diagrams", "cumulative_occurrence_analysis")
     os.makedirs(diagram_folder, exist_ok=True)
 
@@ -98,68 +96,92 @@ def perform_cumulative_occurence_analysis(df, sheet_name, filename_base, min_occ
 
     slopes = {}
     curvatures = {}
+    characterizations = {}
     fbs_results = {}
 
-    designprozess_name = sheet_name
-    all_codes = ["R", "F", "Be", "Bs", "S", "D"]
+    # Nutze filename_base als eindeutigen Designprozessnamen
+    designprozess_name = filename_base
+    print(f"Verarbeite Designprozess: '{designprozess_name}'")
 
-    # Initialisiere FBS-Ergebnisse für diesen Designprozess
+    all_codes = df["Code"].unique()
+
     fbs_results[designprozess_name] = {}
 
     for code in all_codes:
         group = cumulative[cumulative["Code"] == code]
 
         if not group.empty:
-            # FBS unabhängig von min_occurrences
             first_occurrence_segment = group["Segment"].min()
             fbs_results[designprozess_name][code] = "Yes" if first_occurrence_segment <= fbs_threshold else "No"
         else:
             fbs_results[designprozess_name][code] = "No"
 
-        # Nur wenn genug Daten vorhanden sind, Regression berechnen
-        if len(group) >= min_occurrences:
+        # Charakterisierung: Mindestanzahl an Occurrences für Charakterisierung
+        if len(group) >= min_occurrences_char:
             x = group["Segment"]
             y = group["Count"]
 
-            # Lineare Regression
-            slope, _ = np.polyfit(x, y, deg=1)
-            slopes[code] = slope
+            # Berechnung der Steigung nur, wenn genügend Daten für die Steigung vorhanden sind
+            if len(group) >= min_occurrences_slope:  # Hier wird nur die Mindestanzahl für die Steigung geprüft
+                slope, _ = np.polyfit(x, y, deg=1)
+                slopes[code] = slope
+            else:
+                slopes[code] = None  # Wenn die Mindestanzahl nicht erreicht ist, wird keine Steigung berechnet
 
-            # Quadratische Regression
+            # Berechnung der Charakterisierung
             a, b, c = np.polyfit(x, y, deg=2)
-            curvature_type = "linear" if abs(a) < 0.01 else ("convex" if a > 0 else "concave")
-            curvatures[code] = curvature_type
+            if abs(a) < 0.01:
+                curvature_type = "linear"
+            elif a > 0:
+                curvature_type = "convex"
+            else:
+                curvature_type = "concave"
 
-    # Plot 1: Cumulative Occurrence
-    plt.figure(figsize=(8, 6))
-    for code in slopes.keys():
+            curvatures[code] = curvature_type
+            characterizations[code] = curvature_type
+        else:
+            characterizations[code] = "unbekannt"
+
+    plt.figure(figsize=(10, 6))
+    for code in all_codes:
         group = cumulative[cumulative["Code"] == code]
-        plt.plot(group["Segment"], group["Count"].cumsum(), label=f"{code} ({curvatures.get(code)})")
-    plt.title(f"Cumulative Occurrence Analysis: {sheet_name}")
+        if len(group) > 0:
+            plt.plot(group["Segment"], group["Count"].cumsum(), label=f"{code}")
+        else:
+            print(f"Keine Daten für Code {code}.")  # Debugging-Ausgabe
+
+    plt.title(f"Cumulative Occurrence Analysis: {designprozess_name}")
     plt.xlabel("Segment")
     plt.ylabel("Kumulative Häufigkeit")
-    plt.legend(title="Code")
-    plt.grid(axis='y')
-    cumulative_plot_path = os.path.join(diagram_folder, f"{filename_base}_{sheet_name}_cumulative.png")
+    plt.legend(title="Code", loc="best")
+    plt.grid(True)
     plt.tight_layout()
-    plt.savefig(cumulative_plot_path)
+    output_path = os.path.join(diagram_folder, f"{filename_base}_{sheet_name}_cumulative.png")
+    plt.savefig(output_path)
     plt.close()
 
-    # Plot 2: Slopes
-    plt.figure(figsize=(8, 6))
-    codes = list(slopes.keys())
-    values = [slopes[code] for code in codes]
-    plt.bar(codes, values, color='lightgreen', edgecolor='black')
-    plt.title(f"Slope Analysis: {sheet_name}")
+    # Plot: Slope-Barchart (nur Codes mit ausreichender Anzahl an Vorkommen für Steigung anzeigen)
+    plt.figure(figsize=(10, 6))
+
+    # Filter: Nur Codes mit genügend Vorkommen für Steigung
+    filtered_codes = [code for code in all_codes if len(cumulative[cumulative["Code"] == code]) >= min_occurrences_slope]
+    slope_values = [slopes.get(code, None) for code in filtered_codes]  # None für Codes ohne Steigung
+
+    plt.bar(filtered_codes, slope_values, color='skyblue', edgecolor='black')
+    plt.title(f"Slope Analysis: {designprozess_name}")
     plt.xlabel("Code")
     plt.ylabel("Steigung")
     plt.grid(axis='y')
-    slope_plot_path = os.path.join(diagram_folder, f"{filename_base}_{sheet_name}_slopes.png")
     plt.tight_layout()
-    plt.savefig(slope_plot_path)
+    plt.savefig(os.path.join(diagram_folder, f"{filename_base}_{sheet_name}_slopes.png"))
     plt.close()
 
-    return fbs_results
+    return {
+        "fbs_results": fbs_results,
+        "characterizations": {designprozess_name: characterizations},
+    }
+
+
 
 
 def perform_markov_chain_analysis(df, sheet_name, filename_base):

@@ -103,19 +103,36 @@ def setup_routes(app):
         selected_register = None
         image_filenames = []
         fbs_results = {}
+        characterizations = {}
 
         # Analyse ausführen, falls Button gedrückt wurde
         if request.method == "POST":
             selected_register = request.form.get("register")
             fbs_threshold = int(request.form.get("threshold", 5))  # Schwelle aus dem Formular
+            min_occurrences_char = int(request.form.get("min_occurrences_char", 5))  # Mindestanzahl für Charakterisierung
+            min_occurrences_slope = int(request.form.get("min_occurrences_slope", 5))  # Mindestanzahl für Steigung
 
             if selected_register:
                 selected_file = os.path.join(uploads_dir, selected_register)
                 try:
                     df = pd.read_excel(selected_file)
                     filename_base = os.path.splitext(selected_register)[0]
-                    fbs_results = perform_cumulative_occurence_analysis(df, filename_base, filename_base, min_occurrences=5, fbs_threshold=fbs_threshold)
+
+                    # ACHTUNG: sheet_name muss gesetzt sein oder als Parameter kommen
+                    results = perform_cumulative_occurence_analysis(
+                        df,
+                        sheet_name=None,  # ← falls du keinen bestimmten Sheet brauchst
+                        filename_base=filename_base,
+                        min_occurrences_char=min_occurrences_char,
+                        min_occurrences_slope=min_occurrences_slope,
+                        fbs_threshold=fbs_threshold
+                    )
+
+                    fbs_results = results["fbs_results"]
+                    characterizations = results["characterizations"]
+
                     flash(f"✅ Cumulative Occurrence Analysis für {selected_register} erfolgreich durchgeführt.")
+
                     diagram_folder = os.path.join(app.static_folder, 'diagrams', 'cumulative_occurrence_analysis')
                     image_filenames = [
                         f for f in os.listdir(diagram_folder)
@@ -126,11 +143,16 @@ def setup_routes(app):
             else:
                 flash("❌ Kein Register ausgewählt.")
 
-        return render_template("cumulative_occurence_analysis.html",
-                               selected_register=selected_register,
-                               registers=registers,
-                               image_filenames=image_filenames,
-                               fbs_results=fbs_results)
+        # Sowohl für GET als auch POST wird gerendert
+        return render_template(
+            "cumulative_occurence_analysis.html",
+            selected_register=selected_register,
+            registers=registers,
+            image_filenames=image_filenames,
+            fbs_results=fbs_results,
+            characterizations=characterizations
+        )
+
 
     @app.route('/markov_analysis', methods=["GET", "POST"])
     def markov_analysis():

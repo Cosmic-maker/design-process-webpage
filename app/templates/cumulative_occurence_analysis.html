@@ -26,6 +26,14 @@
     <input type="number" name="threshold" id="threshold" value="5" min="1">
     <br><br>
 
+    <label for="min_occurrences_char">Mindestanzahl an Occurrences für Charakterisierung der Linien:</label>
+    <input type="number" name="min_occurrences_char" id="min_occurrences_char" value="5" min="1">
+    <br><br>
+
+    <label for="min_occurrences_slope">Mindestanzahl an Occurrences für Steigung:</label>
+    <input type="number" name="min_occurrences_slope" id="min_occurrences_slope" value="5" min="1">
+    <br><br>
+
     <button type="submit" style="margin-left: 20px;">Erzeugen</button>
 </form>
 
@@ -68,5 +76,30 @@
     </tbody>
 </table>
 {% endif %}
+
+{% if characterizations %}
+<h3>Charakterisierung der Linienverläufe</h3>
+<table border="1">
+    <thead>
+    <tr>
+        <th>Designprozess</th>
+        {% for code in characterizations.values()|first %}
+        <th>{{ code }}</th>
+        {% endfor %}
+    </tr>
+    </thead>
+    <tbody>
+    {% for prozess, code_chars in characterizations.items() %}
+    <tr>
+        <td>{{ prozess }}</td>
+        {% for char in code_chars.values() %}
+        <td>{{ char }}</td>
+        {% endfor %}
+    </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+
 </body>
 </html>
