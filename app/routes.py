@@ -2,7 +2,7 @@ import os
 
 import pandas as pd
 from werkzeug.utils import secure_filename
-from flask import render_template, request, redirect, flash, send_file
+from flask import render_template, request, redirect, flash, send_file, current_app
 from app.logic import process_excel_file, create_combined_excel, perform_markov_chain_analysis
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
@@ -88,23 +88,35 @@ def setup_routes(app):
             flash(f"❌ Fehler beim Download: {str(e)}")
             return redirect("/")
 
-    @app.route("/markov_chain_analysis")
-    def generate_markov():
-        if not os.path.exists(COMBINED_FILENAME):
-            flash("❌ Kombinierte Datei nicht gefunden.")
-            return redirect("/")
 
-        try:
-            # read excel file
-            xls = pd.ExcelFile(COMBINED_FILENAME)
+    @app.route('/markov_analysis', methods=["GET", "POST"])
+    def markov_analysis():
+        uploads_dir = os.path.join('app', 'uploads')
+        selected_register = request.form.get('register')
 
-            for sheet_name in xls.sheet_names:
-                df = xls.parse(sheet_name)
-                perform_markov_chain_analysis(df, sheet_name=sheet_name, filename_base="combined_output")
+        if os.path.exists(uploads_dir):
+            registers = [f for f in os.listdir(uploads_dir) if f.endswith('.xlsx')]
+            print(f"Gefundene Register: {registers}")
+        else:
+            registers = []
+            print(f"Das Verzeichnis {uploads_dir} existiert nicht.")
 
-            flash("📊 Markov-Diagramme erfolgreich erstellt.")
-        except Exception as e:
-            print(f"❌ Fehler bei der Markov-Analyse: {str(e)}")
-            flash(f"❌ Fehler bei der Markov-Analyse: {str(e)}")
+        if request.method == "POST":
+            selected_register = request.form.get("register")
+            if selected_register:
+                selected_file = os.path.join(uploads_dir, selected_register)
+                try:
+                    df = pd.read_excel(selected_file)
+                    perform_markov_chain_analysis(df, selected_register, selected_register)
+                    flash(f"Markov-Analyse für {selected_register} erfolgreich durchgeführt.")
+                except Exception as e:
+                    flash(f"Fehler bei der Analyse der Datei: {str(e)}")
+            else:
+                flash("Kein Register ausgewählt.")
 
-        return redirect("/")
+        uploads_dir = os.path.join(app.root_path, 'uploads')
+        registers = [f for f in os.listdir(uploads_dir) if f.endswith('.xlsx')]
+
+        return render_template("markov_chain_analysis.html",
+                       selected_register=selected_register,
+                       registers=registers)
