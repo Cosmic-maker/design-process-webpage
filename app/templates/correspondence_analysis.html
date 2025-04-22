@@ -1,10 +1,37 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="de">
 <head>
     <meta charset="UTF-8">
-    <title>Correspondence Analysis</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Markov Chain Analysis</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-
+<h1>Correspondence Analysis</h1>
+<form method="POST" action="/correspondence_analysis">
+    <label for="register" style="margin-left: 25px;">      Wählen Sie ein Register:</label>
+    <select name="register" id="register">
+        {% if registers %}
+        {% for register in registers %}
+        <option value="{{ register }}">{{ register }}</option>
+        {% endfor %}
+        {% else %}
+        <option disabled>Keine Register verfügbar</option>
+        {% endif %}
+    </select>
+    <br>
+    <br>
+    <button type="submit" style="margin-left: 20px;">Erzeugen</button>
+</form>
+<div class="center-content">
+    {% if selected_register %}
+    <h2>Correspondence-Diagramm: </h2>
+    <br>
+    <br>
+    <img src="{{ url_for('static', filename='diagrams/' + selected_register + '_correspondence.png') }}" alt="Correspondence Diagramm">
+    {% endif %}
+    <br>
+</div>
+<br><br><br><br><br><br>
 </body>
 </html>

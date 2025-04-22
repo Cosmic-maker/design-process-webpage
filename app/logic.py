@@ -80,7 +80,7 @@ def perform_correspondence_analysis(df, sheet_name, filename_base):
     plt.grid(True)
     plt.legend()
 
-    output_path = os.path.join(DIAGRAM_FOLDER, f"{filename_base}_{sheet_name}.png")
+    output_path = os.path.join(DIAGRAM_FOLDER, f"{sheet_name}_correspondence.png")
     plt.tight_layout()
     plt.savefig(output_path)
     plt.close()
