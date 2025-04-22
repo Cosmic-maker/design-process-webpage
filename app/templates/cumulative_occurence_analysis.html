@@ -10,7 +10,7 @@
 <h1>Cumulative Occurrence Analysis</h1>
 
 <form method="POST" action="/cumulative_occurence_analysis">
-    <label for="register">Wählen Sie ein Register:</label>
+    <label for="register" style="margin-left: 25px;">Wählen Sie ein Register:</label>
     <select name="register" id="register">
         {% if registers %}
         {% for register in registers %}
@@ -22,15 +22,15 @@
     </select>
     <br><br>
 
-    <label for="threshold">Schwelle für First Occurrence (Segment):</label>
+    <label for="threshold" style="margin-left: 25px;">Schwelle für First Occurrence (Segment):</label>
     <input type="number" name="threshold" id="threshold" value="5" min="1">
     <br><br>
 
-    <label for="min_occurrences_char">Mindestanzahl an Occurrences für Charakterisierung der Linien:</label>
+    <label for="min_occurrences_char" style="margin-left: 25px;">Mindestanzahl an Occurrences für Charakterisierung der Linien:</label>
     <input type="number" name="min_occurrences_char" id="min_occurrences_char" value="5" min="1">
     <br><br>
 
-    <label for="min_occurrences_slope">Mindestanzahl an Occurrences für Steigung:</label>
+    <label for="min_occurrences_slope" style="margin-left: 25px;">Mindestanzahl an Occurrences für Steigung:</label>
     <input type="number" name="min_occurrences_slope" id="min_occurrences_slope" value="5" min="1">
     <br><br>
 
@@ -100,6 +100,6 @@
     </tbody>
 </table>
 {% endif %}
-
+<br><br><br><br><br><br>
 </body>
 </html>
