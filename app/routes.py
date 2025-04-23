@@ -89,40 +89,45 @@ def setup_routes(app):
             flash(f"❌ Fehler beim Download: {str(e)}")
             return redirect("/")
 
+
     @app.route('/cumulative_occurence_analysis', methods=["GET", "POST"])
     def cumulative_occurence_analysis():
         uploads_dir = app.config['UPLOAD_FOLDER']
-
-        # Excel-Dateien auflisten
-        if os.path.exists(uploads_dir):
-            registers = [f for f in os.listdir(uploads_dir) if f.endswith('.xlsx')]
-            print(f"Gefundene Register für Cumulative Analysis: {registers}")
-        else:
-            registers = []
-            print(f"❌ Das Verzeichnis {uploads_dir} existiert nicht.")
+        combined_file = os.path.join(uploads_dir, 'combined_output.xlsx')
 
         selected_register = None
         image_filenames = []
         fbs_results = {}
         characterizations = {}
 
-        # Analyse ausführen, falls Button gedrückt wurde
+        # Register aus combined_output.xlsx lesen
+        if os.path.exists(combined_file):
+            try:
+                xls = pd.ExcelFile(combined_file)
+                registers = xls.sheet_names
+                print(f"Register in combined_output.xlsx gefunden: {registers}")
+            except Exception as e:
+                flash(f"❌ Fehler beim Einlesen der kombinierten Datei: {str(e)}")
+                registers = []
+        else:
+            flash("❌ Die kombinierte Datei 'combined_output.xlsx' wurde nicht gefunden.")
+            registers = []
+
+        # Analyse ausführen
         if request.method == "POST":
             selected_register = request.form.get("register")
-            fbs_threshold = int(request.form.get("threshold", 5))  # Schwelle aus dem Formular
-            min_occurrences_char = int(request.form.get("min_occurrences_char", 5))  # Mindestanzahl für Charakterisierung
-            min_occurrences_slope = int(request.form.get("min_occurrences_slope", 5))  # Mindestanzahl für Steigung
+            fbs_threshold = int(request.form.get("threshold", 5))
+            min_occurrences_char = int(request.form.get("min_occurrences_char", 5))
+            min_occurrences_slope = int(request.form.get("min_occurrences_slope", 5))
 
             if selected_register:
-                selected_file = os.path.join(uploads_dir, selected_register)
                 try:
-                    df = pd.read_excel(selected_file)
-                    filename_base = os.path.splitext(selected_register)[0]
+                    df = pd.read_excel(combined_file, sheet_name=selected_register)
+                    filename_base = selected_register  # für Diagrammdateinamen
 
-                    # ACHTUNG: sheet_name muss gesetzt sein oder als Parameter kommen
                     results = perform_cumulative_occurence_analysis(
                         df,
-                        sheet_name=None,  # ← falls du keinen bestimmten Sheet brauchst
+                        sheet_name=selected_register,
                         filename_base=filename_base,
                         min_occurrences_char=min_occurrences_char,
                         min_occurrences_slope=min_occurrences_slope,
@@ -144,7 +149,6 @@ def setup_routes(app):
             else:
                 flash("❌ Kein Register ausgewählt.")
 
-        # Sowohl für GET als auch POST wird gerendert
         return render_template(
             "cumulative_occurence_analysis.html",
             selected_register=selected_register,
@@ -154,33 +158,37 @@ def setup_routes(app):
             characterizations=characterizations
         )
 
+
     @app.route('/correspondence_analysis', methods=["GET", "POST"])
     def correspondence_analysis():
         uploads_dir = os.path.join('app', 'uploads')
+        combined_file = os.path.join(uploads_dir, 'combined_output.xlsx')
         selected_register = request.form.get('register')
 
-        if os.path.exists(uploads_dir):
-            registers = [f for f in os.listdir(uploads_dir) if f.endswith('.xlsx')]
-            print(f"Gefundene Register: {registers}")
+        if os.path.exists(combined_file):
+            try:
+                xls = pd.ExcelFile(combined_file)
+                registers = xls.sheet_names
+                print(f"Register in combined_output.xlsx gefunden: {registers}")
+            except Exception as e:
+                flash(f"Fehler beim Lesen von combined_output.xlsx: {str(e)}")
+                registers = []
         else:
+            flash("Die kombinierte Datei 'combined_output.xlsx' wurde nicht gefunden.")
             registers = []
-            print(f"Das Verzeichnis {uploads_dir} existiert nicht.")
 
         if request.method == "POST":
             selected_register = request.form.get("register")
             if selected_register:
-                selected_file = os.path.join(uploads_dir, selected_register)
+                combined_file = os.path.join(uploads_dir, 'combined_output.xlsx')
                 try:
-                    df = pd.read_excel(selected_file)
+                    df = pd.read_excel(combined_file, sheet_name=selected_register)
                     perform_correspondence_analysis(df, selected_register, selected_register)
-                    flash(f"Correspondance-Analyse für {selected_register} erfolgreich durchgeführt.")
+                    flash(f"✅ Correspondence-Analyse für {selected_register} erfolgreich durchgeführt.")
                 except Exception as e:
-                    flash(f"Fehler bei der Analyse der Datei: {str(e)}")
+                    flash(f"❌ Fehler bei der Analyse der Datei: {str(e)}")
             else:
-                flash("Kein Register ausgewählt.")
-
-        uploads_dir = os.path.join(app.root_path, 'uploads')
-        registers = [f for f in os.listdir(uploads_dir) if f.endswith('.xlsx')]
+                flash("❌ Kein Register ausgewählt.")
 
         return render_template("correspondence_analysis.html",
                                selected_register=selected_register,
@@ -189,32 +197,37 @@ def setup_routes(app):
 
     @app.route('/markov_analysis', methods=["GET", "POST"])
     def markov_analysis():
-        uploads_dir = os.path.join('app', 'uploads')
+        uploads_dir = os.path.join(app.root_path, 'uploads')
+        combined_file = os.path.join(uploads_dir, 'combined_output.xlsx')  # <-- HIER geändert!
         selected_register = request.form.get('register')
 
-        if os.path.exists(uploads_dir):
-            registers = [f for f in os.listdir(uploads_dir) if f.endswith('.xlsx')]
-            print(f"Gefundene Register: {registers}")
+        # Sheetnamen (Register) aus combined_output.xlsx laden
+        if os.path.exists(combined_file):
+            try:
+                xls = pd.ExcelFile(combined_file)
+                registers = xls.sheet_names
+                print(f"Register in combined_output.xlsx gefunden: {registers}")
+            except Exception as e:
+                flash(f"Fehler beim Lesen von combined_output.xlsx: {str(e)}")
+                registers = []
         else:
+            flash("Die kombinierte Datei 'combined_output.xlsx' wurde nicht gefunden.")
             registers = []
-            print(f"Das Verzeichnis {uploads_dir} existiert nicht.")
 
         if request.method == "POST":
             selected_register = request.form.get("register")
             if selected_register:
-                selected_file = os.path.join(uploads_dir, selected_register)
                 try:
-                    df = pd.read_excel(selected_file)
+                    df = pd.read_excel(combined_file, sheet_name=selected_register)
                     perform_markov_chain_analysis(df, selected_register, selected_register)
-                    flash(f"Markov-Analyse für {selected_register} erfolgreich durchgeführt.")
+                    flash(f"Markov-Analyse für Register '{selected_register}' erfolgreich durchgeführt.")
                 except Exception as e:
-                    flash(f"Fehler bei der Analyse der Datei: {str(e)}")
+                    flash(f"Fehler bei der Analyse: {str(e)}")
             else:
                 flash("Kein Register ausgewählt.")
 
-        uploads_dir = os.path.join(app.root_path, 'uploads')
-        registers = [f for f in os.listdir(uploads_dir) if f.endswith('.xlsx')]
-
         return render_template("markov_chain_analysis.html",
-                       selected_register=selected_register,
-                       registers=registers)
+                               selected_register=selected_register,
+                               registers=registers)
+
+

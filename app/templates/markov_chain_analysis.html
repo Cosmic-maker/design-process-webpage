@@ -3,26 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Markov Chain Analysis</title>
+    <title>Markov-Ketten-Analyse</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-<h1>Markov Chain Analysis</h1>
-<form method="POST" action="/markov_analysis">
-    <label for="register" style="margin-left: 25px;">      Wählen Sie ein Register:</label>
-    <select name="register" id="register">
-        {% if registers %}
-        {% for register in registers %}
-        <option value="{{ register }}">{{ register }}</option>
+<h1>Markov-Ketten-Analyse</h1>
+<form method="POST">
+    <label for="register" style="margin-left: 25px;" >Wähle ein Register:</label>
+    <select name="register" id="register" required>
+        {% for r in registers %}
+        <option value="{{ r }}" {% if selected_register == r %}selected{% endif %}>{{ r }}</option>
         {% endfor %}
-        {% else %}
-        <option disabled>Keine Register verfügbar</option>
-        {% endif %}
     </select>
     <br>
     <br>
-    <button type="submit" style="margin-left: 20px;">Erzeugen</button>
+    <button type="submit" style="margin-left: 25px;">Erzeugen</button>
 </form>
+
+
 <div class="center-content">
     {% if selected_register %}
     <h2>Markov-Diagramm: </h2>
