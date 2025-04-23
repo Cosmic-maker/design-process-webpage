@@ -8,28 +8,30 @@
 </head>
 <body>
 <h1>Korrespondenzanalyse</h1>
+
 <form method="POST">
-    <label for="register" style="margin-left: 25px;" >Register auswählen:</label>
-    <br>
+    <label for="register" style="margin-left: 25px;">Register auswählen:</label><br><br>
     <select name="register" id="register" multiple size="6" style="margin-left: 25px;">
         {% for reg in registers %}
         <option value="{{ reg }}">{{ reg }}</option>
         {% endfor %}
-    </select>
-    <br>
-    <br>
+    </select><br><br>
     <button type="submit" style="margin-left: 25px;">Erzeugen</button>
 </form>
 
 <div class="center-content">
-    {% if selected_register %}
-    <h2>Korrespondenzanalyse-Diagramm: </h2>
+    {% if image_filename %}
+    <h2>Korrespondenzanalyse-Diagramm:</h2>
     <br>
     <br>
-    <img src="{{ url_for('static', filename='diagrams/' + selected_register + '_correspondence.png') }}" alt="Correspondence Diagramm">
+    <br>
+    <img src="{{ url_for('static', filename='diagrams/' + image_filename) }}" alt="Diagramm">
+    {% else %}
+    <p>Kein Diagramm verfügbar.</p>
     {% endif %}
-    <br>
 </div>
-<br><br><br><br><br><br>
+<br>
+<br>
+<br>
 </body>
 </html>
