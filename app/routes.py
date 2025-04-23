@@ -158,41 +158,51 @@ def setup_routes(app):
             characterizations=characterizations
         )
 
-
     @app.route('/correspondence_analysis', methods=["GET", "POST"])
     def correspondence_analysis():
-        uploads_dir = os.path.join('app', 'uploads')
-        combined_file = os.path.join(uploads_dir, 'combined_output.xlsx')
-        selected_register = request.form.get('register')
+        combined_file = os.path.join(UPLOAD_FOLDER, 'combined_output.xlsx')
+
+        selected_registers = []
+        image_filename = None
+        registers = []
 
         if os.path.exists(combined_file):
             try:
                 xls = pd.ExcelFile(combined_file)
                 registers = xls.sheet_names
-                print(f"Register in combined_output.xlsx gefunden: {registers}")
             except Exception as e:
                 flash(f"Fehler beim Lesen von combined_output.xlsx: {str(e)}")
-                registers = []
         else:
             flash("Die kombinierte Datei 'combined_output.xlsx' wurde nicht gefunden.")
-            registers = []
 
         if request.method == "POST":
-            selected_register = request.form.get("register")
-            if selected_register:
-                combined_file = os.path.join(uploads_dir, 'combined_output.xlsx')
+            selected_registers = request.form.getlist("register")
+            if selected_registers:
                 try:
-                    df = pd.read_excel(combined_file, sheet_name=selected_register)
-                    perform_correspondence_analysis(df, selected_register, selected_register)
-                    flash(f"✅ Correspondence-Analyse für {selected_register} erfolgreich durchgeführt.")
+                    data_frames = {
+                        reg: pd.read_excel(combined_file, sheet_name=reg)
+                        for reg in selected_registers
+                    }
+
+                    # Alle DataFrames zusammenfassen
+                    combined_df = pd.concat(data_frames.values(), ignore_index=True)
+
+                    # Sicherstellen, dass der Dateiname korrekt generiert wird
+                    output_filename = perform_correspondence_analysis(combined_file, selected_registers)
+
+                    flash(f"✅ Korrespondenzanalyse für {', '.join(selected_registers)} erfolgreich durchgeführt.")
+                    image_filename = output_filename  # Der korrekte Dateiname wird hier gesetzt
                 except Exception as e:
-                    flash(f"❌ Fehler bei der Analyse der Datei: {str(e)}")
+                    flash(f"❌ Fehler bei der Analyse: {str(e)}")
             else:
                 flash("❌ Kein Register ausgewählt.")
 
+
         return render_template("correspondence_analysis.html",
-                               selected_register=selected_register,
-                               registers=registers)
+                               selected_registers=selected_registers,
+                               registers=registers,
+                               image_filename=image_filename)
+
 
 
     @app.route('/markov_analysis', methods=["GET", "POST"])

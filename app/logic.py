@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 import prince
 import os
 
+from sklearn.decomposition import TruncatedSVD
+from sklearn.preprocessing import StandardScaler
 
 ALLOWED_CODES = {"R", "F", "Be", "Bs", "S", "D"}
 DIAGRAM_FOLDER = os.path.join("app", "static", "diagrams")
@@ -53,39 +55,71 @@ def create_combined_excel(sheet_dict, output_path):
 
 
 #Korrespondenzanalyse wird noch nicht verwendet
-def perform_correspondence_analysis(df, sheet_name, filename_base):
-    # ✅ 4. Kreuztabelle & CA
-    contingency_table = pd.crosstab(df['Segment'].astype(str), df['Code'])
+def perform_correspondence_analysis(combined_file, selected_registers):
+    data_frames = {}
 
-    ca = prince.CA(n_components=2)
-    ca = ca.fit(contingency_table)
+    # 1. Lade ausgewählte Sheets und füge "Register"-Spalte hinzu
+    for reg in selected_registers:
+        df = pd.read_excel(combined_file, sheet_name=reg)
+        df["Register"] = reg
+        data_frames[reg] = df
 
-    row_coords = ca.row_coordinates(contingency_table)
-    col_coords = ca.column_coordinates(contingency_table)
+    # 2. Kombiniere alle DataFrames
+    combined_df = pd.concat(data_frames.values(), ignore_index=True)
 
-    # ✅ 5. Diagramm
-    plt.figure(figsize=(8, 6))
-    plt.scatter(row_coords[0], row_coords[1], color='blue', label='Segmente')
-    plt.scatter(col_coords[0], col_coords[1], color='red', label='Codes')
+    # 3. Erstelle eindeutige Segmentbezeichnungen z. B. "Brot: Segment1"
+    combined_df["Segment_Label"] = combined_df["Register"] + ": " + combined_df["Segment"].astype(str)
+
+    # 4. Erstelle Kreuztabelle (Kontingenztabelle)
+    contingency_table = pd.crosstab(combined_df["Segment_Label"], combined_df["Code"])
+
+    # 5. Standardisiere Daten für CA
+    X = StandardScaler().fit_transform(contingency_table)
+
+    # 6. Verwende SVD zur Dimensionsreduktion
+    svd = TruncatedSVD(n_components=2)
+    coords = svd.fit_transform(X)
+
+    # 7. Koordinaten für Segment-Zeilen und Code-Spalten
+    row_coords = pd.DataFrame(coords, index=contingency_table.index)
+    col_coords = pd.DataFrame(svd.components_.T, index=contingency_table.columns)
+
+    # 8. Mapping von Segment zu Register für Farbcodierung
+    segment_to_register = {label: label.split(":")[0] for label in contingency_table.index}
+    color_map = {
+        reg: color for reg, color in zip(selected_registers, ['blue', 'green', 'orange', 'purple', 'brown'])
+    }
+
+    # 9. Diagramm zeichnen
+    plt.figure(figsize=(10, 8))
 
     for i, label in enumerate(row_coords.index):
-        plt.annotate(label, (row_coords.iloc[i, 0], row_coords.iloc[i, 1]), color='blue')
+        reg = segment_to_register[label]
+        color = color_map.get(reg, 'gray')
+        plt.scatter(row_coords.iloc[i, 0], row_coords.iloc[i, 1], color=color, label=reg if i == 0 or reg not in row_coords.index[:i].map(segment_to_register) else "")
+        plt.annotate(label, (row_coords.iloc[i, 0], row_coords.iloc[i, 1]), fontsize=8, color=color)
 
+    # Codes (Spalten)
+    plt.scatter(col_coords[0], col_coords[1], color='red', label='Codes')
     for i, label in enumerate(col_coords.index):
-        plt.annotate(label, (col_coords.iloc[i, 0], col_coords.iloc[i, 1]), color='red')
+        plt.annotate(label, (col_coords.iloc[i, 0], col_coords.iloc[i, 1]), fontsize=8, color='red')
 
     plt.axhline(0, color='grey', lw=1)
     plt.axvline(0, color='grey', lw=1)
-    plt.title(f"Korrespondenzanalyse: {sheet_name}")
-    plt.grid(True)
+    plt.title(f"Korrespondenzanalyse: {', '.join(selected_registers)}")
     plt.legend()
+    plt.grid(True)
 
-    output_path = os.path.join(DIAGRAM_FOLDER, f"{sheet_name}_correspondence.png")
-    plt.tight_layout()
+    # 10. Sicherer Dateiname + Pfad
+    safe_filename = "_".join([reg.replace(" ", "_") for reg in selected_registers])
+    output_filename = f"{safe_filename}_combined_correspondence.png"
+    output_path = os.path.join("app", "static", "diagrams", output_filename)
+
     plt.savefig(output_path)
     plt.close()
 
     print(f"📊 Diagramm gespeichert: {output_path}")
+    return output_filename
 
 
 def perform_cumulative_occurence_analysis(df, sheet_name, filename_base, min_occurrences_char, min_occurrences_slope, fbs_threshold):
