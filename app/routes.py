@@ -1,10 +1,7 @@
 import os
-
-import pandas as pd
 from werkzeug.utils import secure_filename
 from flask import render_template, request, redirect, flash, send_file, current_app
-from app.logic import process_excel_file, create_combined_excel, perform_cumulative_occurence_analysis, \
-    perform_markov_chain_analysis, perform_correspondence_analysis
+from app.logic import process_excel_file, create_combined_excel
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
@@ -35,7 +32,7 @@ def setup_routes(app):
             flash("❌ Keine Dateien hochgeladen.")
             return redirect("/")
 
-        valid_sheets = {}  # Hier speichern wir die verarbeiteten Sheets
+        valid_sheets = {}  # Sheets hier speichern
 
         for file in files:
             if file and allowed_file(file.filename):
@@ -88,156 +85,3 @@ def setup_routes(app):
             print(f"❌ Download-Fehler: {str(e)}")
             flash(f"❌ Fehler beim Download: {str(e)}")
             return redirect("/")
-
-
-    @app.route('/cumulative_occurence_analysis', methods=["GET", "POST"])
-    def cumulative_occurence_analysis():
-        uploads_dir = app.config['UPLOAD_FOLDER']
-        combined_file = os.path.join(uploads_dir, 'combined_output.xlsx')
-
-        selected_register = None
-        image_filenames = []
-        fbs_results = {}
-        characterizations = {}
-
-        # Register aus combined_output.xlsx lesen
-        if os.path.exists(combined_file):
-            try:
-                xls = pd.ExcelFile(combined_file)
-                registers = xls.sheet_names
-                print(f"Register in combined_output.xlsx gefunden: {registers}")
-            except Exception as e:
-                flash(f"❌ Fehler beim Einlesen der kombinierten Datei: {str(e)}")
-                registers = []
-        else:
-            flash("❌ Die kombinierte Datei 'combined_output.xlsx' wurde nicht gefunden.")
-            registers = []
-
-        # Analyse ausführen
-        if request.method == "POST":
-            selected_register = request.form.get("register")
-            fbs_threshold = int(request.form.get("threshold", 5))
-            min_occurrences_char = int(request.form.get("min_occurrences_char", 5))
-            min_occurrences_slope = int(request.form.get("min_occurrences_slope", 5))
-
-            if selected_register:
-                try:
-                    df = pd.read_excel(combined_file, sheet_name=selected_register)
-                    filename_base = selected_register  # für Diagrammdateinamen
-
-                    results = perform_cumulative_occurence_analysis(
-                        df,
-                        sheet_name=selected_register,
-                        filename_base=filename_base,
-                        min_occurrences_char=min_occurrences_char,
-                        min_occurrences_slope=min_occurrences_slope,
-                        fbs_threshold=fbs_threshold
-                    )
-
-                    fbs_results = results["fbs_results"]
-                    characterizations = results["characterizations"]
-
-                    flash(f"✅ Cumulative Occurrence Analysis für {selected_register} erfolgreich durchgeführt.")
-
-                    diagram_folder = os.path.join(app.static_folder, 'diagrams', 'cumulative_occurrence_analysis')
-                    image_filenames = [
-                        f for f in os.listdir(diagram_folder)
-                        if f.startswith(filename_base) and f.endswith('.png')
-                    ]
-                except Exception as e:
-                    flash(f"❌ Fehler bei der Analyse der Datei: {str(e)}")
-            else:
-                flash("❌ Kein Register ausgewählt.")
-
-        return render_template(
-            "cumulative_occurence_analysis.html",
-            selected_register=selected_register,
-            registers=registers,
-            image_filenames=image_filenames,
-            fbs_results=fbs_results,
-            characterizations=characterizations
-        )
-
-    @app.route('/correspondence_analysis', methods=["GET", "POST"])
-    def correspondence_analysis():
-        combined_file = os.path.join(UPLOAD_FOLDER, 'combined_output.xlsx')
-
-        selected_registers = []
-        image_filename = None
-        registers = []
-
-        if os.path.exists(combined_file):
-            try:
-                xls = pd.ExcelFile(combined_file)
-                registers = xls.sheet_names
-            except Exception as e:
-                flash(f"Fehler beim Lesen von combined_output.xlsx: {str(e)}")
-        else:
-            flash("Die kombinierte Datei 'combined_output.xlsx' wurde nicht gefunden.")
-
-        if request.method == "POST":
-            selected_registers = request.form.getlist("register")
-            if selected_registers:
-                try:
-                    data_frames = {
-                        reg: pd.read_excel(combined_file, sheet_name=reg)
-                        for reg in selected_registers
-                    }
-
-                    # Alle DataFrames zusammenfassen
-                    combined_df = pd.concat(data_frames.values(), ignore_index=True)
-
-                    # Sicherstellen, dass der Dateiname korrekt generiert wird
-                    output_filename = perform_correspondence_analysis(combined_file, selected_registers)
-
-                    flash(f"✅ Korrespondenzanalyse für {', '.join(selected_registers)} erfolgreich durchgeführt.")
-                    image_filename = output_filename  # Der korrekte Dateiname wird hier gesetzt
-                except Exception as e:
-                    flash(f"❌ Fehler bei der Analyse: {str(e)}")
-            else:
-                flash("❌ Kein Register ausgewählt.")
-
-
-        return render_template("correspondence_analysis.html",
-                               selected_registers=selected_registers,
-                               registers=registers,
-                               image_filename=image_filename)
-
-
-
-    @app.route('/markov_analysis', methods=["GET", "POST"])
-    def markov_analysis():
-        uploads_dir = os.path.join(app.root_path, 'uploads')
-        combined_file = os.path.join(uploads_dir, 'combined_output.xlsx')  # <-- HIER geändert!
-        selected_register = request.form.get('register')
-
-        # Sheetnamen (Register) aus combined_output.xlsx laden
-        if os.path.exists(combined_file):
-            try:
-                xls = pd.ExcelFile(combined_file)
-                registers = xls.sheet_names
-                print(f"Register in combined_output.xlsx gefunden: {registers}")
-            except Exception as e:
-                flash(f"Fehler beim Lesen von combined_output.xlsx: {str(e)}")
-                registers = []
-        else:
-            flash("Die kombinierte Datei 'combined_output.xlsx' wurde nicht gefunden.")
-            registers = []
-
-        if request.method == "POST":
-            selected_register = request.form.get("register")
-            if selected_register:
-                try:
-                    df = pd.read_excel(combined_file, sheet_name=selected_register)
-                    perform_markov_chain_analysis(df, selected_register, selected_register)
-                    flash(f"Markov-Analyse für Register '{selected_register}' erfolgreich durchgeführt.")
-                except Exception as e:
-                    flash(f"Fehler bei der Analyse: {str(e)}")
-            else:
-                flash("Kein Register ausgewählt.")
-
-        return render_template("markov_chain_analysis.html",
-                               selected_register=selected_register,
-                               registers=registers)
-
-
