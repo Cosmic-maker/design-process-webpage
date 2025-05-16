@@ -13,7 +13,6 @@ ALLOWED_EXTENSIONS = {'xlsx'}
 UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")  # ABSOLUTER Pfad
 COMBINED_FILENAME = os.path.join(UPLOAD_FOLDER, "combined_output.xlsx")  # ABSOLUTER Pfad
 
-# Sicherstellen, dass das Verzeichnis existiert
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 def allowed_file(filename):
@@ -24,7 +23,7 @@ def setup_routes(app):
 
     @app.route("/")
     def index():
-        # Prüfen, ob die kombinierte Datei existiert
+
         combined_file_exists = os.path.exists(COMBINED_FILENAME)
         return render_template("index.html", combined_file_exists=combined_file_exists)
 
@@ -35,7 +34,7 @@ def setup_routes(app):
             flash("❌ Keine Dateien hochgeladen.")
             return redirect("/")
 
-        valid_sheets = {}  # Hier speichern wir die verarbeiteten Sheets
+        valid_sheets = {}
 
         for file in files:
             if file and allowed_file(file.filename):
@@ -100,7 +99,6 @@ def setup_routes(app):
         fbs_results = {}
         characterizations = {}
 
-        # Register aus combined_output.xlsx lesen
         if os.path.exists(combined_file):
             try:
                 xls = pd.ExcelFile(combined_file)
@@ -184,7 +182,6 @@ def setup_routes(app):
                         for reg in selected_registers
                     }
 
-                    # Alle DataFrames zusammenfassen
                     combined_df = pd.concat(data_frames.values(), ignore_index=True)
 
                     # Sicherstellen, dass der Dateiname korrekt generiert wird

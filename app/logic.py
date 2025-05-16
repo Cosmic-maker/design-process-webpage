@@ -34,18 +34,16 @@ def process_excel_file(filepath):
         if not df["Segment"].tolist() == expected_segments:
             raise ValueError(f"Tab '{sheet_name}': 'Segment' muss von 1 bis n durchnummeriert sein.")
 
-        # ✅ Append als Liste von Tupeln
         valid_sheets.append((filename_base, df))
 
     return valid_sheets
 
 def create_combined_excel(sheet_dict, output_path):
-    # Check if the directory exists, if not create it
+
     output_dir = os.path.dirname(output_path)
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    # Check if the file exists or not
     file_exists = os.path.exists(output_path)
 
     # Open the Excel file (write mode if new, append mode if existing)
@@ -144,7 +142,6 @@ def perform_cumulative_occurence_analysis(df, sheet_name, filename_base, min_occ
         group = cumulative[cumulative["Code"] == code]
 
         if not group.empty:
-            # First occurrence at start
             first_occurrence_segment = group["Segment"].min()
             fbs_results[designprozess_name][code] = "Yes" if first_occurrence_segment <= fbs_threshold else "No"
         else:
@@ -156,7 +153,7 @@ def perform_cumulative_occurence_analysis(df, sheet_name, filename_base, min_occ
         # Charakterisierung (min. Anzahl an Occurrences)
         if len(group) >= min_occurrences_char:
             try:
-                # Charakterisierung über quadratische Regression
+                # Charakterisierung über quadr. Regression
                 a, b, c = np.polyfit(x, y, deg=2)
                 if abs(a) < 0.01:
                     curvature_type = "linear"
