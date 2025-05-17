@@ -121,6 +121,7 @@ def perform_correspondence_analysis(combined_file, selected_registers):
 
 
 def perform_cumulative_occurence_analysis(df, sheet_name, filename_base, min_occurrences_char, min_occurrences_slope, fbs_threshold):
+
     diagram_folder = os.path.join("app", "static", "diagrams", "cumulative_occurrence_analysis")
     os.makedirs(diagram_folder, exist_ok=True)
 
@@ -134,11 +135,14 @@ def perform_cumulative_occurence_analysis(df, sheet_name, filename_base, min_occ
     designprozess_name = filename_base
     print(f"Verarbeite Designprozess: '{designprozess_name}'")
 
-    all_codes = df["Code"].unique()
+    # Nur die gewünschten Codes in der vorgegebenen Reihenfolge
+    ordered_codes = ["R", "F", "Be", "S", "Bs", "D"]
+    all_codes = [code for code in ordered_codes if code in df["Code"].unique()]
+
     fbs_results[designprozess_name] = {}
     characterizations[designprozess_name] = {}
 
-    for code in all_codes:
+    for code in ordered_codes:
         group = cumulative[cumulative["Code"] == code]
 
         if not group.empty:
@@ -150,10 +154,9 @@ def perform_cumulative_occurence_analysis(df, sheet_name, filename_base, min_occ
         x = group["Segment"]
         y = group["Count"]
 
-        # Charakterisierung (min. Anzahl an Occurrences)
+        # Charakterisierung
         if len(group) >= min_occurrences_char:
             try:
-                # Charakterisierung über quadr. Regression
                 a, b, c = np.polyfit(x, y, deg=2)
                 if abs(a) < 0.01:
                     curvature_type = "linear"
@@ -169,7 +172,7 @@ def perform_cumulative_occurence_analysis(df, sheet_name, filename_base, min_occ
 
         characterizations[designprozess_name][code] = curvature_type
 
-        # Steigung (nur wenn min. Voraussetzung erfüllt)
+        # Steigung
         if len(group) >= min_occurrences_slope:
             try:
                 slope, _ = np.polyfit(x, y, deg=1)
@@ -182,13 +185,29 @@ def perform_cumulative_occurence_analysis(df, sheet_name, filename_base, min_occ
 
     # Cumulative Occurrence Plot
     plt.figure(figsize=(10, 6))
-    for code in all_codes:
+    for code in ordered_codes:
         group = cumulative[cumulative["Code"] == code]
         if not group.empty:
-            plt.plot(group["Segment"], group["Count"], label=f"{code}")
+            x = group["Segment"].values
+            y = group["Count"].values
+
+            # Linie beginnt bei y=0 (selbes Segment wie erstes echtes Vorkommen)
+            x_extended = np.insert(x, 0, x[0])  # z.B. [3, 3, 4, 5]
+            y_extended = np.insert(y, 0, 0)     # z.B. [0, 1, 2, 3]
+
+            plt.plot(x_extended, y_extended, label=code, linewidth=2)
+
     plt.title(f"Cumulative Occurrence Analysis: {designprozess_name}")
     plt.xlabel("Segment")
-    plt.ylabel("Kumulative Häufigkeit")
+    plt.ylabel("Cumulative Count")
+    plt.ylim(bottom=0)
+    plt.xlim(left=0)
+
+    # Nur Integer-Ticks auf beiden Achsen
+    from matplotlib.ticker import MaxNLocator
+    plt.gca().xaxis.set_major_locator(MaxNLocator(integer=True))
+    plt.gca().yaxis.set_major_locator(MaxNLocator(integer=True))
+
     plt.legend(title="Code", loc="best")
     plt.grid(True)
     plt.tight_layout()
@@ -198,13 +217,22 @@ def perform_cumulative_occurence_analysis(df, sheet_name, filename_base, min_occ
 
     # Slope Barchart
     plt.figure(figsize=(10, 6))
-    filtered_codes = [code for code in all_codes if slopes.get(code) is not None]
-    slope_values = [slopes[code] for code in filtered_codes]
+    slope_values = [slopes.get(code) for code in ordered_codes]
+    bars = []
 
-    plt.bar(filtered_codes, slope_values, color='skyblue', edgecolor='black')
+    for code, val in zip(ordered_codes, slope_values):
+        if val is not None:
+            bars.append(val)
+        else:
+            bars.append(0)
+
+    bar_colors = ['skyblue' if val is not None else 'white' for val in slope_values]
+    edge_colors = ['black' for _ in slope_values]
+
+    plt.bar(ordered_codes, bars, color=bar_colors, edgecolor=edge_colors)
     plt.title(f"Slope Analysis: {designprozess_name}")
     plt.xlabel("Code")
-    plt.ylabel("Steigung")
+    plt.ylabel("Slope")
     plt.grid(axis='y')
     plt.tight_layout()
     plt.savefig(os.path.join(diagram_folder, f"{filename_base}_{sheet_name}_slopes.png"))
@@ -214,6 +242,7 @@ def perform_cumulative_occurence_analysis(df, sheet_name, filename_base, min_occ
         "fbs_results": fbs_results,
         "characterizations": characterizations,
     }
+
 
 def perform_markov_chain_analysis(df, sheet_name, filename_base):
     # Codes extrahieren (hier als Beispiel)
