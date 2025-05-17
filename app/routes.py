@@ -94,7 +94,7 @@ def setup_routes(app):
         uploads_dir = app.config['UPLOAD_FOLDER']
         combined_file = os.path.join(uploads_dir, 'combined_output.xlsx')
 
-        selected_register = None
+        selected_registers = []
         image_filenames = []
         fbs_results = {}
         characterizations = {}
@@ -111,45 +111,48 @@ def setup_routes(app):
             flash("❌ Die kombinierte Datei 'combined_output.xlsx' wurde nicht gefunden.")
             registers = []
 
-        # Analyse ausführen
         if request.method == "POST":
-            selected_register = request.form.get("register")
+            selected_registers = request.form.getlist("register")
             fbs_threshold = int(request.form.get("threshold", 5))
             min_occurrences_char = int(request.form.get("min_occurrences_char", 5))
             min_occurrences_slope = int(request.form.get("min_occurrences_slope", 5))
 
-            if selected_register:
-                try:
-                    df = pd.read_excel(combined_file, sheet_name=selected_register)
-                    filename_base = selected_register  # für Diagrammdateinamen
+            if selected_registers:
+                for selected_register in selected_registers:
+                    try:
+                        df = pd.read_excel(combined_file, sheet_name=selected_register)
+                        filename_base = selected_register
 
-                    results = perform_cumulative_occurence_analysis(
-                        df,
-                        sheet_name=selected_register,
-                        filename_base=filename_base,
-                        min_occurrences_char=min_occurrences_char,
-                        min_occurrences_slope=min_occurrences_slope,
-                        fbs_threshold=fbs_threshold
-                    )
+                        results = perform_cumulative_occurence_analysis(
+                            df,
+                            sheet_name=selected_register,
+                            filename_base=filename_base,
+                            min_occurrences_char=min_occurrences_char,
+                            min_occurrences_slope=min_occurrences_slope,
+                            fbs_threshold=fbs_threshold
+                        )
 
-                    fbs_results = results["fbs_results"]
-                    characterizations = results["characterizations"]
+                        # Ergebnisse zusammenführen
+                        fbs_results.update(results["fbs_results"])
+                        characterizations.update(results["characterizations"])
 
-                    flash(f"✅ Cumulative Occurrence Analysis für {selected_register} erfolgreich durchgeführt.")
+                        flash(f"✅ Analyse für '{selected_register}' erfolgreich durchgeführt.")
 
-                    diagram_folder = os.path.join(app.static_folder, 'diagrams', 'cumulative_occurrence_analysis')
-                    image_filenames = [
-                        f for f in os.listdir(diagram_folder)
-                        if f.startswith(filename_base) and f.endswith('.png')
-                    ]
-                except Exception as e:
-                    flash(f"❌ Fehler bei der Analyse der Datei: {str(e)}")
+                        diagram_folder = os.path.join(app.static_folder, 'diagrams', 'cumulative_occurrence_analysis')
+                        found_images = [
+                            f for f in os.listdir(diagram_folder)
+                            if f.startswith(filename_base) and f.endswith('.png')
+                        ]
+                        image_filenames.extend(found_images)
+
+                    except Exception as e:
+                        flash(f"❌ Fehler bei '{selected_register}': {str(e)}")
             else:
                 flash("❌ Kein Register ausgewählt.")
 
         return render_template(
             "cumulative_occurence_analysis.html",
-            selected_register=selected_register,
+            selected_register=selected_registers,
             registers=registers,
             image_filenames=image_filenames,
             fbs_results=fbs_results,
