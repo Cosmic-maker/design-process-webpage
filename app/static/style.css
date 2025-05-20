@@ -50,6 +50,23 @@ button:hover, .btn:hover {
     flex-wrap: wrap;
 }
 
+.btn-small {
+    padding: 5px 12px;
+    font-size: 14px;
+    background-color: #6A5ACD;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.btn-small:hover {
+    background-color: #5a4fcf;
+    transform: translateY(-3px);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+}
+
 .data-button-wrapper {
     margin-top: 4rem;
     display: flex;

@@ -4,6 +4,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import prince
 import os
+import matplotlib
+matplotlib.use('Agg')
 
 from sklearn.decomposition import TruncatedSVD
 from sklearn.preprocessing import StandardScaler
@@ -244,66 +246,85 @@ def perform_cumulative_occurence_analysis(df, sheet_name, filename_base, min_occ
     }
 
 
-def perform_markov_chain_analysis(df, sheet_name, filename_base):
-    # Codes extrahieren (hier als Beispiel)
+def perform_markov_chain_analysis(df, sheet_name, filename_base, threshold=0.0):
     codes = df["Code"].astype(str).tolist()
     transitions = list(zip(codes[:-1], codes[1:]))
-
-    # Übergangshäufigkeit berechnen
     transition_counts = {from_code: {to_code: 0 for to_code in ALLOWED_CODES} for from_code in ALLOWED_CODES}
     for from_code, to_code in transitions:
         if from_code in ALLOWED_CODES and to_code in ALLOWED_CODES:
             transition_counts[from_code][to_code] += 1
 
-    # Wahrscheinlichkeiten berechnen
-    transition_probs = {from_code: {to_code: 0 for to_code in ALLOWED_CODES} for from_code in ALLOWED_CODES}
+    transition_probs = {}
     for from_code in ALLOWED_CODES:
         total_transitions = sum(transition_counts[from_code].values())
+        if total_transitions == 0:
+            continue
+
+        transition_probs[from_code] = {}
         for to_code in ALLOWED_CODES:
-            if total_transitions > 0:
-                transition_probs[from_code][to_code] = transition_counts[from_code][to_code] / total_transitions
+            prob = transition_counts[from_code][to_code] / total_transitions
+            if prob >= threshold:
+                transition_probs[from_code][to_code] = prob
 
     G = nx.DiGraph()
 
     for code in ALLOWED_CODES:
-        G.add_node(code, size=1000)
+        if code in transition_probs or any(code in v for v in transition_probs.values()):
+            G.add_node(code, size=1000)
 
-
-    for from_code in ALLOWED_CODES:
-        for to_code in ALLOWED_CODES:
-            prob = transition_probs[from_code][to_code]
+    for from_code in transition_probs:
+        for to_code, prob in transition_probs[from_code].items():
             if prob > 0:
                 G.add_edge(from_code, to_code, weight=prob)
 
-    plt.figure(figsize=(8, 8))
-    pos = nx.spring_layout(G, seed=42)
-    nx.draw_networkx_nodes(G, pos, node_size=3000, node_color='skyblue', edgecolors="black", alpha=0.7)
+    # Visualisierung
+    try:
+        plt.figure(figsize=(8, 8))
 
-    edges = G.edges()
-    weights = [G[u][v]["weight"] for u, v in edges]
-    nx.draw_networkx_edges(
-        G,
-        pos,
-        edgelist=edges,
-        width=[weight * 10 for weight in weights],
-        alpha=0.7,
-        edge_color='grey',
-        arrows=True,
-        arrowstyle='-|>',
-        min_source_margin=25,
-        min_target_margin=25,
-        connectionstyle='arc3,rad=0.1'
-    )
-    nx.draw_networkx_labels(G, pos, font_size=14, font_weight='bold', font_color='black')
+        if len(G.nodes()) == 0:
+            plt.text(0.5, 0.5, "Keine Übergänge über der Schwelle",
+                     ha='center', va='center')
+        else:
+            fixed_positions = {
+                'R': (0, 1),
+                'F': (1, 1),
+                'Be': (1, 0),
+                'S': (2, 1),
+                'Bs': (2, 0),
+                'D': (2, -1)
+            }
+            pos = {k: fixed_positions[k] for k in G.nodes() if k in fixed_positions}
 
-    plt.title(f"Markov Chain Analysis: {sheet_name}")
+            nx.draw_networkx_nodes(G, pos, node_size=3000,
+                                   node_color='skyblue', edgecolors="black", alpha=0.7)
 
-    DIAGRAM_FOLDER = os.path.join(os.getcwd(), 'app', 'static', "diagrams")
-    os.makedirs(DIAGRAM_FOLDER, exist_ok=True)
-    output_path = os.path.join(DIAGRAM_FOLDER, f"{sheet_name}_markov.png")
+            edges = G.edges()
+            weights = [G[u][v]["weight"] for u, v in edges]
+            nx.draw_networkx_edges(
+                G, pos, edgelist=edges,
+                width=[weight * 10 for weight in weights],
+                alpha=0.7, edge_color='grey', arrows=True,
+                arrowstyle='-|>', min_source_margin=25,
+                min_target_margin=25, connectionstyle='arc3,rad=0.1'
+            )
 
-    plt.tight_layout()
-    plt.savefig(output_path)
-    plt.close()
+            edge_labels = {(u, v): f"{w:.2f}" for u, v, w in G.edges(data='weight')}
+            nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels)
 
-    print(f"🔁 Markov-Diagramm gespeichert: {output_path}")
+            nx.draw_networkx_labels(G, pos, font_size=14,
+                                    font_weight='bold', font_color='black')
+
+        plt.title(f"Markov Chain: {sheet_name} (Schwelle: {threshold*100:.0f}%)")
+
+        markov_dir = os.path.join(DIAGRAM_FOLDER, "markov")
+        os.makedirs(markov_dir, exist_ok=True)
+        output_path = os.path.join(markov_dir, f"{sheet_name}_markov_{threshold}.png")
+
+        plt.tight_layout()
+        plt.savefig(output_path)
+        plt.close()
+
+    except Exception as e:
+        print(f"Fehler bei der Diagrammerstellung: {e}")
+    finally:
+        plt.close('all')

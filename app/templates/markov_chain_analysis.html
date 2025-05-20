@@ -1,35 +1,137 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Markov-Ketten-Analyse</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Markov Chain Analysis</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+    <style>
+        .container {
+            max-width: 1100px;
+            margin: 40px auto 40px auto;
+            padding: 0 20px;
+            box-sizing: border-box;
+        }
+        h1 {
+            text-align: center;
+            margin-top: 40px;
+            margin-bottom: 40px;
+        }
+        .form-container {
+            max-width: 700px;
+            margin: 40px auto 60px auto;
+            padding: 25px 30px;
+            border: 2px solid #7B68EE;
+            border-radius: 12px;
+            background-color: #EDEBFF;
+            box-shadow: 0 6px 15px rgba(123, 104, 238, 0.3);
+        }
+        .markov-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+            gap: 25px;
+            margin: 40px auto;
+            max-width: 1300px;
+        }
+        .markov-container {
+            border: 1px solid #ccc;
+            padding: 15px;
+            border-radius: 8px;
+            background: white;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+        }
+        .markov-title {
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 15px;
+            font-size: 1.1rem;
+            color: #333;
+        }
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 500;
+        }
+        select {
+            width: 100%;
+            max-width: 300px;
+            margin-bottom: 15px;
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+        }
+        .button-group {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .btn {
+            padding: 9px 22px;
+            font-size: 1rem;
+            background-color: #7B68EE;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .btn:hover {
+            background-color: #6A5ACD;
+        }
+        .btn-small {
+            padding: 7px 16px;
+            font-size: 0.95rem;
+        }
+    </style>
 </head>
 <body>
-<h1>Markov-Ketten-Analyse</h1>
-<form method="POST">
-    <label for="register" style="margin-left: 25px;" >Wähle ein Register:</label>
-    <select name="register" id="register" required>
-        {% for r in registers %}
-        <option value="{{ r }}" {% if selected_register == r %}selected{% endif %}>{{ r }}</option>
-        {% endfor %}
-    </select>
-    <br>
-    <br>
-    <button type="submit" style="margin-left: 25px;">Erzeugen</button>
-</form>
 
+<div class="container">
+    <h1>Markov Chain Analysis</h1>
 
-<div class="center-content">
-    {% if selected_register %}
-    <h2>Markov-Diagramm: </h2>
-    <br>
-    <br>
-    <img src="{{ url_for('static', filename='diagrams/' + selected_register + '_markov.png') }}" alt="Markov Diagramm">
+    <div class="form-container">
+        <form method="POST" id="main-form">
+            <div>
+                <label for="register">Choose register:</label>
+                <select name="register" id="register" multiple size="5">
+                    {% for r in registers %}
+                    <option value="{{ r }}" {% if r in selected_registers %}selected{% endif %}>{{ r }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label for="threshold">Filter by Transition Probability:</label>
+                <select name="threshold" id="threshold">
+                    <option value="0" {% if threshold == 0 %}selected{% endif %}>0% (all transitions)</option>
+                    <option value="0.2" {% if threshold == 0.2 %}selected{% endif %}>20%</option>
+                    <option value="0.5" {% if threshold == 0.5 %}selected{% endif %}>50%</option>
+                </select>
+            </div>
+            <p style="margin: 0 0 10px 0; font-size: 14px; color: #555; font-style: italic;">
+                Please first generate diagrams, then apply probability threshold
+            </p><br>
+            <div class="button-group">
+                <button type="submit" name="action" value="generate" class="btn btn-small">Generate diagrams</button>
+                <button type="submit" name="action" value="apply_threshold" class="btn btn-small">Apply threshold</button>
+            </div>
+        </form>
+    </div>
+
+    {% if selected_registers %}
+    <div style="width: 100%; max-width: 1300px; margin: 0 auto 80px auto;">
+        <div class="markov-grid">
+            {% for register in selected_registers %}
+            <div class="markov-container">
+                <div class="markov-title">{{ register }}</div>
+                <img src="{{ url_for('static', filename='diagrams/markov/' + register + '_markov_' + threshold|string + '.png') }}"
+                     alt="Markov Diagram for {{ register }}" style="width: 100%; height: auto;">
+            </div>
+            {% endfor %}
+        </div>
+    </div>
     {% endif %}
-    <br>
 </div>
-<br><br><br><br><br><br>
+
 </body>
 </html>

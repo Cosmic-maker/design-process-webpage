@@ -3,31 +3,30 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Korrespondenzanalyse</title>
+    <title>Correspondence Analysis</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-<h1>Korrespondenzanalyse</h1>
+<h1>Correspondence Analysis</h1>
 
 <form method="POST">
-    <label for="register" style="margin-left: 25px;">Register auswählen:</label><br><br>
+    <label for="register" style="margin-left: 25px;">Choose register:</label><br><br>
     <select name="register" id="register" multiple size="6" style="margin-left: 25px;">
         {% for reg in registers %}
         <option value="{{ reg }}">{{ reg }}</option>
         {% endfor %}
     </select><br><br>
-    <button type="submit" style="margin-left: 25px;">Erzeugen</button>
+    <button type="submit" style="margin-left: 25px;">Generate</button>
 </form>
-
 <div class="center-content">
     {% if image_filename %}
-    <h2>Korrespondenzanalyse-Diagramm:</h2>
+    <h2>Correspondence Analysis-Diagram:</h2>
     <br>
     <br>
     <br>
     <img src="{{ url_for('static', filename='diagrams/' + image_filename) }}" alt="Diagramm">
     {% else %}
-    <p>Kein Diagramm verfügbar.</p>
+    <p>No diagram available.</p>
     {% endif %}
 </div>
 <br>
