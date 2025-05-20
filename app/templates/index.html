@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Startseite</title>
+    <title>Design Process Analysis</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-<h1>Designprozess-Analyse</h1>
+<h1>Design Process Analysis</h1>
 
 {% with messages = get_flashed_messages() %}
 {% if messages %}
@@ -18,40 +18,35 @@
 </div>
 {% endif %}
 {% endwith %}
-
 <div class="center-content">
-    <label class="info-text">Laden Sie Ihre Excel-Dateien hoch (1 Datei pro Designprozess):</label>
+    <label class="info-text">Upload your Excel files (1 file per design process):</label>
 </div>
 
 <div class="center-content">
     <form method="POST" action="/upload" enctype="multipart/form-data" class="upload-form">
         <input type="file" name="files" multiple accept=".xlsx" required>
         <br><br><br>
-        <button type="submit" class="btn">Dateien hochladen</button>
+        <button type="submit" class="btn">Upload file</button>
     </form>
 </div>
 
 {% if combined_file_exists %}
 <div class="button-row">
-    <a href="/download_combined_file" class="btn">Kombinierte Datei herunterladen</a>
+    <a href="/download_combined_file" class="btn">Download merged file</a>
 </div>
 {% endif %}
-
 <p class="info-text">
-    Nach erfolgreichem Upload wählen Sie unten eine Analyseart aus.
+    After uploading successfully, select an analysis method below.
 </p>
-
 <div class="button-row">
     <form action="/correspondence_analysis" method="get">
-        <button type="submit">Korrespondenzanalyse</button>
+        <button type="submit">Correspondence Analysis</button>
     </form>
-    <button class="btn" onclick="location.href='/cumulative_occurence_analysis'">Kumulative Häufigkeitsanalyse</button>
+    <button class="btn" onclick="location.href='/cumulative_occurence_analysis'">Cumulative Occurrence</button>
     <form action="/markov_analysis" method="get">
-        <button type="submit">Markov-Ketten-Analyse</button>
+        <button type="submit">Markov Model Analysis</button>
     </form>
-
 </div>
 <br><br><br><br><br><br>
-
 </body>
 </html>

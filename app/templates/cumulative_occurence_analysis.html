@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Kumulative Häufigkeitsanalyse</title>
+    <title>Cumulative Occurrence</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
     <style>
         .container {
@@ -57,38 +57,36 @@
 
 <div class="container">
 
-    <h1>Kumulative Häufigkeitsanalyse</h1>
-
-    <!-- Formular in Box -->
+    <h1>Cumulative Occurrence</h1>
     <div style="max-width:700px; margin: 40px auto 60px auto; padding: 25px 30px; border: 2px solid #7B68EE; border-radius: 12px; background-color: #EDEBFF; box-shadow: 0 6px 15px rgba(123, 104, 238, 0.3);">
         <form method="POST" action="/cumulative_occurence_analysis">
-            <label for="register" style="display:block; margin-bottom: 6px;">Wählen Sie ein Register:</label>
+            <label for="register" style="display:block; margin-bottom: 6px;">Choose register:</label>
             <select name="register" id="register" multiple size="5" style="width: 100%; max-width: 300px; margin-bottom: 15px;">
                 {% if registers %}
                 {% for register in registers %}
                 <option value="{{ register }}">{{ register }}</option>
                 {% endfor %}
                 {% else %}
-                <option disabled>Keine Register verfügbar</option>
+                <option disabled>No register available</option>
                 {% endif %}
             </select>
 
-            <label for="threshold" style="display:block; margin-bottom: 6px;">Schwelle für First Occurrence (Segment):</label>
+            <label for="threshold" style="display:block; margin-bottom: 6px;">Threshold for First Occurrence (Segment):</label>
             <input type="number" name="threshold" id="threshold" value="5" min="1" style="margin-bottom: 15px; max-width: 100px;" />
 
-            <label for="min_occurrences_char" style="display:block; margin-bottom: 6px;">Mindestanzahl an Occurrences für Charakterisierung der Linien:</label>
+            <label for="min_occurrences_char" style="display:block; margin-bottom: 6px;">Minimum occurrence count for curve characterization:</label>
             <input type="number" name="min_occurrences_char" id="min_occurrences_char" value="5" min="1" style="margin-bottom: 15px; max-width: 100px;" />
 
-            <label for="min_occurrences_slope" style="display:block; margin-bottom: 6px;">Mindestanzahl an Occurrences für Steigung:</label>
+            <label for="min_occurrences_slope" style="display:block; margin-bottom: 6px;">Minimum occurrence count for slope calculation:</label>
             <input type="number" name="min_occurrences_slope" id="min_occurrences_slope" value="5" min="1" style="margin-bottom: 25px; max-width: 100px;" />
-
-            <button type="submit" style="padding: 9px 22px; font-size: 1.1rem;">Erzeugen</button>
+            <br><br>
+            <button type="submit" style="padding: 9px 22px; font-size: 1.1rem;">Generate</button>
         </form>
     </div>
 
     {% if image_filenames %}
     <h2 class="centered-title" style="margin-bottom: 50px;">
-        Erzeugte Diagramme für "{{ selected_register | join(', ') if selected_register else '' }}":
+        Generated diagram "{{ selected_register | join(', ') if selected_register else '' }}":
     </h2>
 
     <div style="width: 100%; max-width: 1300px; margin: 0 auto 140px auto;">
@@ -114,7 +112,7 @@
     {% else %}
     {% if selected_register %}
     <p style="text-align:center; margin-bottom: 140px;">
-        Keine Diagramme gefunden für {{ selected_register | join(', ') if selected_register else '' }}.
+        No diagram found {{ selected_register | join(', ') if selected_register else '' }}.
     </p>
     {% endif %}
     {% endif %}
@@ -122,11 +120,11 @@
     {% if fbs_results and characterizations %}
     <div class="tables-container" style="margin-top: 140px; margin-bottom: 80px; width: 100%; max-width: 1300px; margin-left: auto; margin-right: auto; gap: 40px; display: flex; flex-wrap: nowrap; justify-content: center;">
         <div style="flex: 1; max-width: 700px;">
-            <h3 style="text-align:center; margin-bottom: 20px;">First Occurrence at Start (FBS) Ergebnisse:</h3>
+            <h3 style="text-align:center; margin-bottom: 20px;">First Occurrence at Start (FBS) Results:</h3>
             <table>
                 <thead>
                 <tr>
-                    <th>Designprozess</th>
+                    <th>Design process</th>
                     {% for code in fbs_results.values()|first %}
                     <th>{{ code }}</th>
                     {% endfor %}
@@ -146,7 +144,7 @@
         </div>
 
         <div style="flex: 1; max-width: 700px;">
-            <h3 style="text-align:center; margin-bottom: 20px;">Charakterisierung der Linienverläufe</h3>
+            <h3 style="text-align:center; margin-bottom: 20px;">Characterization of Curve Progression</h3>
             <table>
                 <thead>
                 <tr>
