@@ -161,48 +161,62 @@ def setup_routes(app):
 
     @app.route('/correspondence_analysis', methods=["GET", "POST"])
     def correspondence_analysis():
-        combined_file = os.path.join(UPLOAD_FOLDER, 'combined_output.xlsx')
+        combined_file = os.path.join(current_app.root_path, 'uploads', 'combined_output.xlsx')
 
         selected_registers = []
         image_filename = None
         registers = []
+        analysis_type = 'process_phases'  # Default
 
-        if os.path.exists(combined_file):
-            try:
-                xls = pd.ExcelFile(combined_file)
-                registers = xls.sheet_names
-            except Exception as e:
-                flash(f"Error reading combined_output.xlsx: {str(e)}")
-        else:
-            flash("Combined file 'combined_output.xlsx' was not found.")
+        # Prüfe, ob Datei existiert
+        if not os.path.exists(combined_file):
+            flash("❌ Combined file 'combined_output.xlsx' not found.", 'error')
+            return render_template("correspondence_analysis.html",
+                                   registers=[],
+                                   selected_registers=[],
+                                   image_filename=None,
+                                   analysis_type=analysis_type)
 
+        # Lese Register (Blätter)
+        try:
+            xls = pd.ExcelFile(combined_file)
+            registers = xls.sheet_names
+        except Exception as e:
+            flash(f"❌ Error reading Excel file: {str(e)}", 'error')
+            return render_template("correspondence_analysis.html",
+                                   registers=[],
+                                   selected_registers=[],
+                                   image_filename=None,
+                                   analysis_type=analysis_type)
+
+        # Formularabsendung
         if request.method == "POST":
             selected_registers = request.form.getlist("register")
-            if selected_registers:
-                try:
-                    data_frames = {
-                        reg: pd.read_excel(combined_file, sheet_name=reg)
-                        for reg in selected_registers
-                    }
+            analysis_type = request.form.get("analysis_type", "process_phases")
 
-                    combined_df = pd.concat(data_frames.values(), ignore_index=True)
-
-                    # Sicherstellen, dass der Dateiname korrekt generiert wird
-                    output_filename = perform_correspondence_analysis(combined_file, selected_registers)
-
-                    flash(f"✅ Correspondence Analysis for {', '.join(selected_registers)} was successfully carried out.")
-                    image_filename = output_filename  # Der korrekte Dateiname wird hier gesetzt
-                except Exception as e:
-                    flash(f"❌ Analysis error: {str(e)}")
+            if not selected_registers:
+                flash("❌ Please select at least one register.", 'error')
             else:
-                flash("❌ No register selected.")
-
+                try:
+                    if analysis_type == 'whole_process' and len(selected_registers) < 2:
+                        flash("❌ Whole process analysis requires at least 2 processes.", 'error')
+                    else:
+                        image_filename = perform_correspondence_analysis(
+                            combined_file,
+                            selected_registers,
+                            analysis_type
+                        )
+                        flash(f"✅ {analysis_type.replace('_', ' ').title()} completed successfully for: {', '.join(selected_registers)}", 'success')
+                except ValueError as e:
+                    flash(f"❌ {str(e)}", 'error')
+                except Exception as e:
+                    flash(f"❌ Analysis error: {str(e)}", 'error')
 
         return render_template("correspondence_analysis.html",
                                selected_registers=selected_registers,
                                registers=registers,
-                               image_filename=image_filename)
-
+                               image_filename=image_filename,
+                               analysis_type=analysis_type)
 
 
     @app.route('/markov_analysis', methods=["GET", "POST"])

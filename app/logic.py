@@ -2,11 +2,9 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import prince
 import os
 import matplotlib
 matplotlib.use('Agg')
-
 from sklearn.decomposition import TruncatedSVD
 from sklearn.preprocessing import StandardScaler
 
@@ -54,71 +52,156 @@ def create_combined_excel(sheet_dict, output_path):
             df.to_excel(writer, sheet_name=sheet_name, index=False)
 
 
-#Korrespondenzanalyse wird noch nicht verwendet
-def perform_correspondence_analysis(combined_file, selected_registers):
-    data_frames = {}
+def perform_correspondence_analysis(combined_file, selected_registers, analysis_type='process_phases'):
+    from collections import defaultdict
 
-    # 1. Lade ausgewählte Sheets und füge "Register"-Spalte hinzu
+    if not selected_registers:
+        raise ValueError("No registers selected")
+
+    if analysis_type == 'whole_process' and len(selected_registers) < 2:
+        raise ValueError("Whole process analysis requires at least 2 processes")
+
+    # Daten laden
+    data_frames = []
     for reg in selected_registers:
         df = pd.read_excel(combined_file, sheet_name=reg)
         df["Register"] = reg
-        data_frames[reg] = df
+        data_frames.append(df)
 
-    # 2. Kombiniere alle DataFrames
-    combined_df = pd.concat(data_frames.values(), ignore_index=True)
+    combined_df = pd.concat(data_frames, ignore_index=True)
 
-    # 3. Erstelle eindeutige Segmentbezeichnungen z. B. "Brot: Segment1"
-    combined_df["Segment_Label"] = combined_df["Register"] + ": " + combined_df["Segment"].astype(str)
+    # Labels erstellen
+    if analysis_type == 'whole_process':
+        combined_df["Analysis_Label"] = combined_df["Register"]
+    else:
+        if len(selected_registers) == 1:
+            combined_df["Analysis_Label"] = "Segment " + combined_df["Segment"].astype(str)
+        else:
+            combined_df["Analysis_Label"] = combined_df["Register"] + ": Segment " + combined_df["Segment"].astype(str)
 
-    # 4. Erstelle Kreuztabelle (Kontingenztabelle)
-    contingency_table = pd.crosstab(combined_df["Segment_Label"], combined_df["Code"])
+    # Kontingenztabelle
+    contingency_table = pd.crosstab(combined_df["Analysis_Label"], combined_df["Code"])
 
-    # 5. Standardisiere Daten für CA
+    # Standardisieren + SVD
     X = StandardScaler().fit_transform(contingency_table)
-
-    # 6. Verwende SVD zur Dimensionsreduktion
     svd = TruncatedSVD(n_components=2)
     coords = svd.fit_transform(X)
 
-    # 7. Koordinaten für Segment-Zeilen und Code-Spalten
-    row_coords = pd.DataFrame(coords, index=contingency_table.index)
-    col_coords = pd.DataFrame(svd.components_.T, index=contingency_table.columns)
+    row_coords = pd.DataFrame(coords, index=contingency_table.index, columns=['Dim1', 'Dim2'])
+    col_coords = pd.DataFrame(svd.components_.T, index=contingency_table.columns, columns=['Dim1', 'Dim2'])
 
-    # 8. Mapping von Segment zu Register für Farbcodierung
-    segment_to_register = {label: label.split(":")[0] for label in contingency_table.index}
-    color_map = {
-        reg: color for reg, color in zip(selected_registers, ['blue', 'green', 'orange', 'purple', 'brown'])
-    }
+    # Erklärte Varianz in Prozent
+    explained_var = svd.explained_variance_ratio_ * 100
 
-    # 9. Diagramm zeichnen
-    plt.figure(figsize=(10, 8))
+    # Farben (mehr Farben für viele Register)
+    unique_registers = list(dict.fromkeys(combined_df["Register"]))
+    base_colors = ['blue', 'green', 'orange', 'purple', 'brown', 'red', 'pink', 'cyan', 'magenta', 'yellow']
+    color_map = {reg: base_colors[i % len(base_colors)] for i, reg in enumerate(unique_registers)}
 
-    for i, label in enumerate(row_coords.index):
-        reg = segment_to_register[label]
-        color = color_map.get(reg, 'gray')
-        plt.scatter(row_coords.iloc[i, 0], row_coords.iloc[i, 1], color=color, label=reg if i == 0 or reg not in row_coords.index[:i].map(segment_to_register) else "")
-        plt.annotate(label, (row_coords.iloc[i, 0], row_coords.iloc[i, 1]), fontsize=8, color=color)
+    plt.figure(figsize=(12, 8))
 
-    # Codes (Spalten)
-    plt.scatter(col_coords[0], col_coords[1], color='red', label='Codes')
-    for i, label in enumerate(col_coords.index):
-        plt.annotate(label, (col_coords.iloc[i, 0], col_coords.iloc[i, 1]), fontsize=8, color='red')
+    # === Analyse-Labels gruppieren nach gerundeten Koordinaten ===
+    coord_groups = defaultdict(list)
+    for label in row_coords.index:
+        x = round(row_coords.loc[label, 'Dim1'], 5)
+        y = round(row_coords.loc[label, 'Dim2'], 5)
+        coord_groups[(x, y)].append(label)
 
-    plt.axhline(0, color='grey', lw=1)
-    plt.axvline(0, color='grey', lw=1)
-    plt.title(f"Korrespondenzanalyse: {', '.join(selected_registers)}")
-    plt.legend()
+    # Punkte und Beschriftungen der Analyse-Labels
+    for (x, y), labels in coord_groups.items():
+        # Bestimme Farbe nach Register des ersten Labels
+        first_label = labels[0]
+        if ":" in first_label:
+            reg = first_label.split(":")[0].strip()
+        else:
+            reg = combined_df[combined_df["Analysis_Label"] == first_label]["Register"].iloc[0]
+
+        plt.scatter(x, y, color=color_map.get(reg, 'black'), s=50, marker='o')
+
+        # Wenn nur ein Label, normal beschriften
+        if len(labels) == 1:
+            # Beschriftung ohne „Segment“
+            import re
+            lab = labels[0]
+            new_label = re.sub(r'Segment\s*', '', lab)
+            plt.annotate(new_label,
+                         (x, y),
+                         fontsize=8,
+                         color=color_map.get(reg, 'black'),
+                         xytext=(5, 5),
+                         textcoords='offset points',
+                         ha='left', va='bottom')
+        else:
+            # Mehrere Labels: Segmentnummern extrahieren ohne "Segment" und prefix ohne Segmentnummer
+            segments = []
+            prefix = None
+            import re
+            for lab in labels:
+                m = re.search(r'Segment\s*(\d+)', lab)
+                if m:
+                    segments.append(m.group(1))
+                    prefix_candidate = lab[:m.start()].strip()
+                    if prefix is None:
+                        prefix = prefix_candidate
+                else:
+                    segments.append(lab)
+                    prefix = None
+
+            if prefix:
+                label_text = f"{prefix}: {','.join(segments)}"
+            else:
+                label_text = ",".join(segments)
+
+            plt.annotate(label_text,
+                         (x, y),
+                         fontsize=8,
+                         color=color_map.get(reg, 'black'),
+                         xytext=(5, 5),
+                         textcoords='offset points',
+                         ha='left', va='bottom')
+
+    # === Codes gruppieren ===
+    code_groups = defaultdict(list)
+    for code in col_coords.index:
+        x = round(col_coords.loc[code, 'Dim1'], 5)
+        y = round(col_coords.loc[code, 'Dim2'], 5)
+        code_groups[(x, y)].append(code)
+
+    # Punkte für Codes (rot) und Beschriftungen
+    for (x, y), codes in code_groups.items():
+        plt.scatter(x, y, color='red', marker='o', s=30)
+        label_text = ",".join(codes)
+        plt.annotate(label_text,
+                     (x, y),
+                     fontsize=10,
+                     color='red',
+                     xytext=(5, 5),
+                     textcoords='offset points',
+                     ha='left', va='bottom')
+
+    plt.axhline(0, color='gray', linestyle='--')
+    plt.axvline(0, color='gray', linestyle='--')
+
+    plt.title(f"Correspondence Analysis: {'Whole Processes' if analysis_type == 'whole_process' else 'Process Phases'}")
+    plt.xlabel(f"Dim1 ({explained_var[0]:.1f}%)")
+    plt.ylabel(f"Dim2 ({explained_var[1]:.1f}%)")
+
+    plt.legend(handles=[plt.Line2D([0], [0], marker='o', color='w', label=reg,
+                                   markerfacecolor=col, markersize=8)
+                        for reg, col in color_map.items()])
     plt.grid(True)
 
-    # 10. Sicherer Dateiname + Pfad
-    safe_filename = "_".join([reg.replace(" ", "_") for reg in selected_registers])
-    output_filename = f"{safe_filename}_combined_correspondence.png"
-    output_path = os.path.join("app", "static", "diagrams", output_filename)
+    # Speichern
+    output_dir = os.path.join(os.path.dirname(__file__), 'static', 'diagrams')
+    os.makedirs(output_dir, exist_ok=True)
+
+    safe_name = "_".join([reg.replace(" ", "_") for reg in selected_registers])
+    output_filename = f"correspondence_{safe_name}_{analysis_type}.png"
+    output_path = os.path.join(output_dir, output_filename)
 
     plt.savefig(output_path)
     plt.close()
 
-    print(f"📊 Diagramm gespeichert: {output_path}")
     return output_filename
 
 
