@@ -1,36 +1,187 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Correspondence Analysis</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+    <style>
+        /* Container zentriert mit max-Breite und Padding */
+        .container {
+            max-width: 1100px;
+            margin: 40px auto;
+            padding: 0 20px;
+            box-sizing: border-box;
+        }
+        /* Überschrift zentriert */
+        h1 {
+            text-align: center;
+            margin-top: 40px;
+            margin-bottom: 40px;
+        }
+        /* Formular-Container mit violettem Rahmen und Schatten */
+        .form-container {
+            max-width: 700px;
+            margin: 40px auto 60px auto;
+            padding: 25px 30px;
+            border: 2px solid #7B68EE;
+            border-radius: 12px;
+            background-color: #EDEBFF;
+            box-shadow: 0 6px 15px rgba(123, 104, 238, 0.3);
+        }
+        /* Labels */
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 500;
+            color: #333;
+        }
+        /* Select-Elemente */
+        select {
+            width: 100%;
+            max-width: 300px;
+            margin-bottom: 15px;
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            font-size: 1rem;
+        }
+        /* Hinweistext */
+        p small {
+            font-style: italic;
+            color: #555;
+        }
+        /* Buttons */
+        .btn {
+            padding: 9px 22px;
+            font-size: 1rem;
+            background-color: #7B68EE;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .btn:hover {
+            background-color: #6A5ACD;
+        }
+        /* Button-Gruppe mit Abstand */
+        .button-group {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        /* Für einzelne Buttons in Formularen ohne Gruppe */
+        button {
+            padding: 9px 22px;
+            font-size: 1rem;
+            background-color: #7B68EE;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #6A5ACD;
+        }
+        /* Bereich für Ergebnisse */
+        .result-section {
+            max-width: 1300px;
+            margin: 0 auto 80px auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+        }
+        /* Bildcontainer */
+        .diagram-container {
+            text-align: center;
+            margin-top: 20px;
+        }
+        .diagram-container img {
+            width: 100%;
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+        }
+        /* Flash-Messages */
+        .flash-message {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .flash-message.error {
+            background-color: #ffdddd;
+            border-left: 4px solid #f44336;
+        }
+        .flash-message.success {
+            background-color: #ddffdd;
+            border-left: 4px solid #4CAF50;
+        }
+    </style>
 </head>
 <body>
-<h1>Correspondence Analysis</h1>
 
-<form method="POST">
-    <label for="register" style="margin-left: 25px;">Choose register:</label><br><br>
-    <select name="register" id="register" multiple size="6" style="margin-left: 25px;">
-        {% for reg in registers %}
-        <option value="{{ reg }}">{{ reg }}</option>
+<div class="container">
+    <h1>Correspondence Analysis</h1>
+
+    <div class="form-container">
+        <form method="POST" id="main-form">
+            <div>
+                <label for="register"><strong>Select Design Processes:</strong></label>
+                <select name="register" id="register" multiple size="6">
+                    {% for reg in registers %}
+                    <option value="{{ reg }}" {% if reg in selected_registers %}selected{% endif %}>{{ reg }}</option>
+                    {% endfor %}
+                </select>
+                <p><small>Hold CTRL/CMD to select multiple</small></p>
+            </div>
+
+            <div style="margin-top: 15px;">
+                <label for="analysis_type"><strong>Analysis Type:</strong></label>
+                <select name="analysis_type" id="analysis_type">
+                    <option value="process_phases" {% if analysis_type == 'process_phases' %}selected{% endif %}>
+                    Process Phases Analysis
+                    </option>
+                    <option value="whole_process" {% if analysis_type == 'whole_process' %}selected{% endif %}>
+                    Whole Process Analysis (requires ≥2 processes)
+                    </option>
+                </select>
+            </div>
+
+            <button type="submit" style="margin-top: 20px;">Generate Analysis Diagram</button>
+        </form>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <div class="flash-messages">
+        {% for category, message in messages %}
+        <div class="flash-message {{ category }}">{{ message }}</div>
         {% endfor %}
-    </select><br><br>
-    <button type="submit" style="margin-left: 25px;">Generate</button>
-</form>
-<div class="center-content">
+    </div>
+    {% endif %}
+    {% endwith %}
+
     {% if image_filename %}
-    <h2>Correspondence Analysis-Diagram:</h2>
-    <br>
-    <br>
-    <br>
-    <img src="{{ url_for('static', filename='diagrams/' + image_filename) }}" alt="Diagramm">
-    {% else %}
-    <p>No diagram available.</p>
+    <div class="result-section">
+        <h2>
+            {% if analysis_type == 'whole_process' %}
+            Whole Process Correspondence Analysis
+            {% else %}
+            Process Phases Correspondence Analysis
+            {% endif %}
+        </h2>
+        <div class="diagram-container">
+            <img src="{{ url_for('static', filename='diagrams/' + image_filename) }}"
+                 alt="Correspondence Analysis Diagram">
+        </div>
+    </div>
     {% endif %}
 </div>
-<br>
-<br>
-<br>
+
 </body>
 </html>
