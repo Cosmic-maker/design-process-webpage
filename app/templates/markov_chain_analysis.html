@@ -92,7 +92,7 @@
     <div class="form-container">
         <form method="POST" id="main-form">
             <div>
-                <label for="register">Choose register:</label>
+                <label for="register"><strong>Choose register:</strong></label>
                 <select name="register" id="register" multiple size="5">
                     {% for r in registers %}
                     <option value="{{ r }}" {% if r in selected_registers %}selected{% endif %}>{{ r }}</option>
@@ -101,7 +101,7 @@
             </div>
 
             <div>
-                <label for="threshold">Filter by Transition Probability:</label>
+                <label for="threshold"><strong>Filter by Transition Probability:</strong></label>
                 <select name="threshold" id="threshold">
                     <option value="0" {% if threshold == 0 %}selected{% endif %}>0% (all transitions)</option>
                     <option value="0.2" {% if threshold == 0.2 %}selected{% endif %}>20%</option>

@@ -131,13 +131,12 @@
     <div class="form-container">
         <form method="POST" id="main-form">
             <div>
-                <label for="register"><strong>Select Design Processes:</strong></label>
+                <label for="register"><strong>Choose register:</strong></label>
                 <select name="register" id="register" multiple size="6">
                     {% for reg in registers %}
                     <option value="{{ reg }}" {% if reg in selected_registers %}selected{% endif %}>{{ reg }}</option>
                     {% endfor %}
                 </select>
-                <p><small>Hold CTRL/CMD to select multiple</small></p>
             </div>
 
             <div style="margin-top: 15px;">

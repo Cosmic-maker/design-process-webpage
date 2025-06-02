@@ -60,7 +60,7 @@
     <h1>Cumulative Occurrence</h1>
     <div style="max-width:700px; margin: 40px auto 60px auto; padding: 25px 30px; border: 2px solid #7B68EE; border-radius: 12px; background-color: #EDEBFF; box-shadow: 0 6px 15px rgba(123, 104, 238, 0.3);">
         <form method="POST" action="/cumulative_occurence_analysis">
-            <label for="register" style="display:block; margin-bottom: 6px;">Choose register:</label>
+            <label for="register" style="display:block; margin-bottom: 6px;"><strong>Choose register:</strong></label>
             <select name="register" id="register" multiple size="5" style="width: 100%; max-width: 300px; margin-bottom: 15px;">
                 {% if registers %}
                 {% for register in registers %}
@@ -71,13 +71,13 @@
                 {% endif %}
             </select>
 
-            <label for="threshold" style="display:block; margin-bottom: 6px;">Threshold for First Occurrence (Segment):</label>
+            <label for="threshold" style="display:block; margin-bottom: 6px;"><strong>Threshold for First Occurrence (Segment):</strong></label>
             <input type="number" name="threshold" id="threshold" value="5" min="1" style="margin-bottom: 15px; max-width: 100px;" />
 
-            <label for="min_occurrences_char" style="display:block; margin-bottom: 6px;">Minimum occurrence count for curve characterization:</label>
+            <label for="min_occurrences_char" style="display:block; margin-bottom: 6px;"><strong>Minimum occurrence count for curve characterization:</strong></label>
             <input type="number" name="min_occurrences_char" id="min_occurrences_char" value="5" min="1" style="margin-bottom: 15px; max-width: 100px;" />
 
-            <label for="min_occurrences_slope" style="display:block; margin-bottom: 6px;">Minimum occurrence count for slope calculation:</label>
+            <label for="min_occurrences_slope" style="display:block; margin-bottom: 6px;"><strong>Minimum occurrence count for slope calculation:</strong></label>
             <input type="number" name="min_occurrences_slope" id="min_occurrences_slope" value="5" min="1" style="margin-bottom: 25px; max-width: 100px;" />
             <br><br>
             <button type="submit" style="padding: 9px 22px; font-size: 1.1rem;">Generate</button>
