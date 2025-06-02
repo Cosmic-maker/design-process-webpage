@@ -1,56 +1,49 @@
 import unittest
-from unittest.mock import patch
-import matplotlib.pyplot as plt  # Nur notwendig, wenn du wirklich speicherst
+import pandas as pd
+import numpy as np
 
-# Angenommen, deine Logikfunktionen heißen z. B.:
-# from your_module import analyse_prozesse, erstelle_diagramm, berechne_markov_matrix
+# Dummy-Funktionen, die du in deinen echten Code einbauen kannst
+def perform_correspondence_analysis(processes):
+    return {proc: f"Analyse von {proc}" for proc in processes}
 
-class TestLogic(unittest.TestCase):
+def perform_cumulative_occurrence_analysis(processes):
+    return [f"Diagramm für {proc}" for proc in processes]
 
-    def test_process_selection(self):
-        """Teste, ob 1-N Prozesse ausgewählt werden können"""
-        selected_processes = ["Designprozess1", "Designprozess2", "Designprozess3"]
+def perform_markov_chain_analysis(data):
+    codes = ["F", "B", "S"]
+    mat = pd.DataFrame(np.array([
+        [0.1, 0.7, 0.2],
+        [0.4, 0.4, 0.2],
+        [0.3, 0.3, 0.4],
+    ]), index=codes, columns=codes)
+    return mat
 
-        # Hier sollte deine echte Analysefunktion stehen:
-        # processed_processes = analyse_prozesse(selected_processes)
-        processed_processes = selected_processes.copy()  # Simulierte Verarbeitung
 
-        self.assertEqual(len(processed_processes), 3)
-        self.assertIn("Designprozess2", processed_processes)
+class Test(unittest.TestCase):
 
-    @patch('matplotlib.pyplot.savefig')  # Verhindert tatsächliches Speichern
-    def test_diagram_creation(self, mock_save):
-        """Teste die Diagrammerstellung pro Prozess"""
+    def test_correspondence_analysis_selection(self):
+        processes = ["Designprozess1", "Designprozess2", "Designprozess3"]
+        result = perform_correspondence_analysis(processes)
+        self.assertEqual(len(result), len(processes))
+        for proc in processes:
+            self.assertIn(proc, result)
+            self.assertIsInstance(result[proc], str)
+
+    def test_cumulative_occurrence_analysis_diagrams(self):
         processes = ["Designprozess1", "Designprozess2"]
+        diagrams = perform_cumulative_occurrence_analysis(processes)
+        self.assertEqual(len(diagrams), len(processes))
+        for diagram in diagrams:
+            self.assertIsInstance(diagram, str)
 
-        created_diagrams = []
-        for process in processes:
-            # Hier sollte dein echter Funktionsaufruf stehen:
-            # pfad = erstelle_diagramm(process)
-            pfad = f"diagram_{process}.png"
-            created_diagrams.append(pfad)
+    def test_markov_chain_analysis_transition_matrix(self):
+        data = "dummy_data"
+        matrix = perform_markov_chain_analysis(data)
+        self.assertIsInstance(matrix, pd.DataFrame)
+        self.assertEqual(matrix.shape[0], matrix.shape[1])
+        # Prüfe, ob alle Werte zwischen 0 und 1 liegen
+        self.assertTrue(((matrix.values >= 0) & (matrix.values <= 1)).all())
 
-        self.assertEqual(len(created_diagrams), 2)
-        self.assertTrue(all(d.startswith("diagram_") for d in created_diagrams))
 
-    def test_markov_matrix(self):
-        """Teste die Markov-Transitionsmatrix"""
-        test_transitions = [
-            ["R", "F"],
-            ["F", "Be"],
-            ["Be", "S"]
-        ]
-
-        # Hier sollte deine echte Matrix-Berechnung stehen:
-        # calculated_matrix = berechne_markov_matrix(test_transitions)
-        calculated_matrix = {
-            "R": {"F": 1.0},
-            "F": {"Be": 1.0},
-            "Be": {"S": 1.0}
-        }
-
-        self.assertEqual(calculated_matrix["R"]["F"], 1.0)
-        self.assertEqual(len(calculated_matrix), 3)
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()
