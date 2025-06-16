@@ -18,7 +18,7 @@
             margin-bottom: 40px;
         }
         .form-container {
-            max-width: 700px;
+            max-width: 750px;  /* Vergrößert von 700px auf 750px */
             margin: 40px auto 60px auto;
             padding: 25px 30px;
             border: 2px solid #7B68EE;
@@ -64,6 +64,7 @@
             display: flex;
             gap: 15px;
             margin-top: 20px;
+            flex-wrap: wrap; /* Ermöglicht das Umbruch der Buttons bei kleineren Bildschirmen */
         }
         .btn {
             padding: 9px 22px;
@@ -74,6 +75,7 @@
             border-radius: 4px;
             cursor: pointer;
             transition: background-color 0.3s;
+            white-space: nowrap; /* Verhindert Zeilenumbrüche im Button-Text */
         }
         .btn:hover {
             background-color: #6A5ACD;
@@ -109,11 +111,12 @@
                 </select>
             </div>
             <p style="margin: 0 0 10px 0; font-size: 14px; color: #555; font-style: italic;">
-                Please first generate diagrams, then apply probability threshold
+                Please first generate diagrams, then apply threshold or show dominant transition probabilities.
             </p><br>
             <div class="button-group">
                 <button type="submit" name="action" value="generate" class="btn btn-small">Generate diagrams</button>
                 <button type="submit" name="action" value="apply_threshold" class="btn btn-small">Apply threshold</button>
+                <button type="submit" name="action" value="show_dominant" class="btn btn-small">Show dominant transitions</button>
             </div>
         </form>
     </div>
@@ -124,7 +127,7 @@
             {% for register in selected_registers %}
             <div class="markov-container">
                 <div class="markov-title">{{ register }}</div>
-                <img src="{{ url_for('static', filename='diagrams/markov/' + register + '_markov_' + threshold|string + '.png') }}"
+                <img src="{{ url_for('static', filename='diagrams/markov/' + register + '_markov_' + threshold|string + '_' + (action if action in ['show_dominant'] else 'normal') + '.png') }}"
                      alt="Markov Diagram for {{ register }}" style="width: 100%; height: auto;">
             </div>
             {% endfor %}

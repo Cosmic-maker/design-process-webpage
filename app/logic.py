@@ -329,7 +329,7 @@ def perform_cumulative_occurence_analysis(df, sheet_name, filename_base, min_occ
     }
 
 
-def perform_markov_chain_analysis(df, sheet_name, filename_base, threshold=0.0):
+def perform_markov_chain_analysis(df, sheet_name, filename_base, threshold=0.0, action="generate"):
     codes = df["Code"].astype(str).tolist()
     transitions = list(zip(codes[:-1], codes[1:]))
     transition_counts = {from_code: {to_code: 0 for to_code in ALLOWED_CODES} for from_code in ALLOWED_CODES}
@@ -348,6 +348,28 @@ def perform_markov_chain_analysis(df, sheet_name, filename_base, threshold=0.0):
             prob = transition_counts[from_code][to_code] / total_transitions
             if prob >= threshold:
                 transition_probs[from_code][to_code] = prob
+
+    # Nur die dominanten Übergänge behalten, wenn show_dominant ausgewählt wurde
+    if action == "show_dominant":
+        # Neue Logik: Für jeden Zielzustand nur den Übergang mit höchster Wahrscheinlichkeit behalten
+        dominant_transitions = {}
+
+        # Erst alle möglichen Übergänge sammeln
+        for from_code in transition_probs:
+            for to_code, prob in transition_probs[from_code].items():
+                if to_code not in dominant_transitions:
+                    dominant_transitions[to_code] = (from_code, prob)
+                else:
+                    # Nur behalten wenn Wahrscheinlichkeit höher ist
+                    if prob > dominant_transitions[to_code][1]:
+                        dominant_transitions[to_code] = (from_code, prob)
+
+        # Übergangsmatrix neu aufbauen
+        new_transition_probs = {from_code: {} for from_code in ALLOWED_CODES}
+        for to_code, (from_code, prob) in dominant_transitions.items():
+            new_transition_probs[from_code][to_code] = prob
+
+        transition_probs = new_transition_probs
 
     G = nx.DiGraph()
 
@@ -374,7 +396,7 @@ def perform_markov_chain_analysis(df, sheet_name, filename_base, threshold=0.0):
                 'Be': (1, 0),
                 'S': (2, 1),
                 'Bs': (2, 0),
-                'D': (2, -1)
+                'D': (3, 1)
             }
             pos = {k: fixed_positions[k] for k in G.nodes() if k in fixed_positions}
 
@@ -397,11 +419,16 @@ def perform_markov_chain_analysis(df, sheet_name, filename_base, threshold=0.0):
             nx.draw_networkx_labels(G, pos, font_size=14,
                                     font_weight='bold', font_color='black')
 
-        plt.title(f"Markov Chain: {sheet_name} (Schwelle: {threshold*100:.0f}%)")
+        title = f"Markov Chain: {sheet_name}"
+        if action == "show_dominant":
+            title += " (dominant transitions only)"
+        else:
+            title += f" (threshold: {threshold*100:.0f}%)"
+        plt.title(title)
 
         markov_dir = os.path.join(DIAGRAM_FOLDER, "markov")
         os.makedirs(markov_dir, exist_ok=True)
-        output_path = os.path.join(markov_dir, f"{sheet_name}_markov_{threshold}.png")
+        output_path = os.path.join(markov_dir, f"{sheet_name}_markov_{threshold}_{action if action in ['show_dominant'] else 'normal'}.png")
 
         plt.tight_layout()
         plt.savefig(output_path)

@@ -226,6 +226,7 @@ def setup_routes(app):
 
         selected_registers = []
         threshold = 0.0
+        action = "generate"  # Standardwert
 
         if request.method == "POST":
             selected_registers = request.form.getlist("register")
@@ -237,12 +238,11 @@ def setup_routes(app):
             else:
                 try:
                     xls = pd.ExcelFile(combined_file)
-                    if action == "generate" or action == "apply_threshold":
+                    if action in ["generate", "apply_threshold", "show_dominant"]:
                         for register in selected_registers:
                             df = pd.read_excel(combined_file, sheet_name=register)
-                            perform_markov_chain_analysis(df, register, register, threshold)
-                        flash("Diagram updated." if action == "apply_threshold"
-                              else "Diagram generated.")
+                            perform_markov_chain_analysis(df, register, register, threshold, action)
+                        flash("Diagram updated." if action != "generate" else "Diagram generated.")
                 except Exception as e:
                     flash(f"Analysis error: {e}")
 
@@ -261,6 +261,7 @@ def setup_routes(app):
         return render_template("markov_chain_analysis.html",
                                selected_registers=selected_registers,
                                registers=registers,
-                               threshold=threshold)
+                               threshold=threshold,
+                               action=action)
 
 
