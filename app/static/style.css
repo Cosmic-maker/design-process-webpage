@@ -79,3 +79,39 @@ button:hover, .btn:hover {
     margin-top: 4rem;
 }
 
+input[type="file"] {
+    display: none;
+}
+
+.upload-form {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem; /* Abstand zwischen den Buttons */
+}
+
+.custom-file-upload {
+    padding: 0.8rem 1.8rem;       /* etwas kleiner */
+    font-size: 1.1rem;
+    color: white;                 /* weiße Schrift */
+    background-color: #6A5ACD;    /* lila Hintergrund wie andere Buttons */
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+    transition: all 0.2s ease-in-out;
+    width: fit-content;
+    text-align: center;
+    display: block;
+}
+
+.custom-file-upload:hover {
+    background-color: #5a4fcf;    /* dunkleres Lila beim Hover */
+    transform: translateY(-3px);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+}
+
+.upload-form button.btn {
+    min-width: 260px;
+    font-weight: bold;
+}

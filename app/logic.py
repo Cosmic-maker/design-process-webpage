@@ -7,6 +7,7 @@ import matplotlib
 matplotlib.use('Agg')
 from sklearn.decomposition import TruncatedSVD
 from sklearn.preprocessing import StandardScaler
+from matplotlib.ticker import MaxNLocator
 
 ALLOWED_CODES = {"R", "F", "Be", "Bs", "S", "D"}
 DIAGRAM_FOLDER = os.path.join("app", "static", "diagrams")
@@ -204,9 +205,7 @@ def perform_correspondence_analysis(combined_file, selected_registers, analysis_
 
     return output_filename
 
-
 def perform_cumulative_occurence_analysis(df, sheet_name, filename_base, min_occurrences_char, min_occurrences_slope, fbs_threshold):
-
     diagram_folder = os.path.join("app", "static", "diagrams", "cumulative_occurrence_analysis")
     os.makedirs(diagram_folder, exist_ok=True)
 
@@ -220,30 +219,44 @@ def perform_cumulative_occurence_analysis(df, sheet_name, filename_base, min_occ
     designprozess_name = filename_base
     print(f"Verarbeite Designprozess: '{designprozess_name}'")
 
-    # Nur die gewünschten Codes in der vorgegebenen Reihenfolge
     ordered_codes = ["R", "F", "Be", "S", "Bs", "D"]
-    all_codes = [code for code in ordered_codes if code in df["Code"].unique()]
-
     fbs_results[designprozess_name] = {}
     characterizations[designprozess_name] = {}
 
+    max_segment = df["Segment"].max()
+
+    # Analyse pro Code
     for code in ordered_codes:
         group = cumulative[cumulative["Code"] == code]
-
         if not group.empty:
             first_occurrence_segment = group["Segment"].min()
             fbs_results[designprozess_name][code] = "Yes" if first_occurrence_segment <= fbs_threshold else "No"
         else:
             fbs_results[designprozess_name][code] = "No"
 
-        x = group["Segment"]
-        y = group["Count"]
+        x = group["Segment"].values
+        y = group["Count"].values
 
-        # Charakterisierung
-        if len(group) >= min_occurrences_char:
+        if len(x) == 0:
+            characterizations[designprozess_name][code] = "n.A."
+            slopes[code] = None
+            continue
+
+        # Linie beginnt bei y=0
+        x_extended = np.insert(x, 0, x[0])
+        y_extended = np.insert(y, 0, 0)
+
+        # Linie waagrecht bis max_segment weiterführen
+        if x_extended[-1] < max_segment:
+            x_extended = np.append(x_extended, max_segment)
+            y_extended = np.append(y_extended, y_extended[-1])
+
+        # Charakterisierung (mit erweiterten Punkten)
+        if len(x_extended) >= min_occurrences_char:
             try:
-                a, b, c = np.polyfit(x, y, deg=2)
-                if abs(a) < 0.01:
+                a, b, c = np.polyfit(x_extended, y_extended, deg=2)
+                threshold = curvature_threshold(max_segment)
+                if abs(a) < threshold:
                     curvature_type = "linear"
                 elif a > 0:
                     curvature_type = "convex"
@@ -251,16 +264,16 @@ def perform_cumulative_occurence_analysis(df, sheet_name, filename_base, min_occ
                     curvature_type = "concave"
             except Exception as e:
                 print(f"Fehler bei der Charakterisierung für Code {code}: {e}")
-                curvature_type = "unbekannt"
+                curvature_type = "n.A."
         else:
-            curvature_type = "unbekannt"
+            curvature_type = "n.A."
 
         characterizations[designprozess_name][code] = curvature_type
 
-        # Steigung
-        if len(group) >= min_occurrences_slope:
+        # Steigung (mit erweiterten Punkten)
+        if len(x_extended) >= min_occurrences_slope:
             try:
-                slope, _ = np.polyfit(x, y, deg=1)
+                slope, _ = np.polyfit(x_extended, y_extended, deg=1)
                 slopes[code] = slope
             except Exception as e:
                 print(f"Fehler bei der Steigungsberechnung für Code {code}: {e}")
@@ -276,9 +289,11 @@ def perform_cumulative_occurence_analysis(df, sheet_name, filename_base, min_occ
             x = group["Segment"].values
             y = group["Count"].values
 
-            # Linie beginnt bei y=0 (selbes Segment wie erstes echtes Vorkommen)
-            x_extended = np.insert(x, 0, x[0])  # z.B. [3, 3, 4, 5]
-            y_extended = np.insert(y, 0, 0)     # z.B. [0, 1, 2, 3]
+            x_extended = np.insert(x, 0, x[0])
+            y_extended = np.insert(y, 0, 0)
+            if x_extended[-1] < max_segment:
+                x_extended = np.append(x_extended, max_segment)
+                y_extended = np.append(y_extended, y_extended[-1])
 
             plt.plot(x_extended, y_extended, label=code, linewidth=2)
 
@@ -286,16 +301,13 @@ def perform_cumulative_occurence_analysis(df, sheet_name, filename_base, min_occ
     plt.xlabel("Segment")
     plt.ylabel("Cumulative Count")
     plt.ylim(bottom=0)
-    plt.xlim(left=0)
-
-    # Nur Integer-Ticks auf beiden Achsen
-    from matplotlib.ticker import MaxNLocator
+    plt.xlim(left=0, right=max_segment)
     plt.gca().xaxis.set_major_locator(MaxNLocator(integer=True))
     plt.gca().yaxis.set_major_locator(MaxNLocator(integer=True))
-
     plt.legend(title="Code", loc="best")
     plt.grid(True)
     plt.tight_layout()
+
     output_path = os.path.join(diagram_folder, f"{filename_base}_{sheet_name}_cumulative.png")
     plt.savefig(output_path)
     plt.close()
@@ -303,14 +315,7 @@ def perform_cumulative_occurence_analysis(df, sheet_name, filename_base, min_occ
     # Slope Barchart
     plt.figure(figsize=(10, 6))
     slope_values = [slopes.get(code) for code in ordered_codes]
-    bars = []
-
-    for code, val in zip(ordered_codes, slope_values):
-        if val is not None:
-            bars.append(val)
-        else:
-            bars.append(0)
-
+    bars = [val if val is not None else 0 for val in slope_values]
     bar_colors = ['skyblue' if val is not None else 'white' for val in slope_values]
     edge_colors = ['black' for _ in slope_values]
 
@@ -327,6 +332,10 @@ def perform_cumulative_occurence_analysis(df, sheet_name, filename_base, min_occ
         "fbs_results": fbs_results,
         "characterizations": characterizations,
     }
+
+def curvature_threshold(max_segment):
+    return max(0.0003, 0.008 - (max_segment / 1000))
+
 
 
 def perform_markov_chain_analysis(df, sheet_name, filename_base, threshold=0.0, action="generate"):

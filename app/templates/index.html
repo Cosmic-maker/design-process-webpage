@@ -24,10 +24,13 @@
 
 <div class="center-content">
     <form method="POST" action="/upload" enctype="multipart/form-data" class="upload-form">
-        <input type="file" name="files" multiple accept=".xlsx" required>
-        <br><br><br>
+        <label for="file-upload" class="custom-file-upload">
+            📂 Select Excel Files
+        </label>
+        <input id="file-upload" type="file" name="files" multiple accept=".xlsx" required>
         <button type="submit" class="btn">Upload file</button>
     </form>
+
 </div>
 
 {% if combined_file_exists %}
