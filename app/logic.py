@@ -1,10 +1,15 @@
+import textwrap
+
 import networkx as nx
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import os
 import matplotlib
+from adjustText import adjust_text
+
 matplotlib.use('Agg')
+import random
 from sklearn.decomposition import TruncatedSVD
 from sklearn.preprocessing import StandardScaler
 from matplotlib.ticker import MaxNLocator
@@ -22,22 +27,31 @@ def process_excel_file(filepath):
     for sheet_name in xls.sheet_names:
         df = xls.parse(sheet_name)
 
-        if list(df.columns[:2]) != ["Segment", "Code"]:
-            raise ValueError(f"Tab '{sheet_name}': Spalten müssen 'Segment' und 'Code' heißen.")
+        # Prüfe Spaltennamen
+        if list(df.columns[:3]) != ["Segment", "Code", "Phase"]:
+            raise ValueError(f"Tab '{sheet_name}': Erste drei Spalten müssen 'Segment', 'Code', 'Phase' heißen.")
 
+        # Prüfe 'Segment' auf ganze Zahlen
         if not pd.api.types.is_integer_dtype(df["Segment"]):
             raise ValueError(f"Tab '{sheet_name}': 'Segment' muss aus ganzen Zahlen bestehen.")
 
+        # Prüfe 'Code' auf erlaubte Werte
         if not all(code in ALLOWED_CODES for code in df["Code"].astype(str)):
             raise ValueError(f"Tab '{sheet_name}': 'Code' enthält ungültige Werte.")
 
+        # Prüfe 'Segment'-Reihenfolge
         expected_segments = list(range(1, len(df) + 1))
         if not df["Segment"].tolist() == expected_segments:
             raise ValueError(f"Tab '{sheet_name}': 'Segment' muss von 1 bis n durchnummeriert sein.")
 
+        # Prüfe, dass 'Phase' nicht leer ist
+        if df["Phase"].isnull().any() or df["Phase"].astype(str).str.strip().eq("").any():
+            raise ValueError(f"Tab '{sheet_name}': 'Phase' darf keine leeren Zellen enthalten.")
+
         valid_sheets.append((filename_base, df))
 
     return valid_sheets
+
 
 def create_combined_excel(sheet_dict, output_path):
 
@@ -52,9 +66,13 @@ def create_combined_excel(sheet_dict, output_path):
         for sheet_name, df in sheet_dict.items():
             df.to_excel(writer, sheet_name=sheet_name, index=False)
 
-
 def perform_correspondence_analysis(combined_file, selected_registers, analysis_type='process_phases'):
-    from collections import defaultdict
+    import matplotlib.pyplot as plt
+    import pandas as pd
+    from sklearn.preprocessing import StandardScaler
+    from sklearn.decomposition import TruncatedSVD
+    from adjustText import adjust_text
+    import os
 
     if not selected_registers:
         raise ValueError("No registers selected")
@@ -68,22 +86,22 @@ def perform_correspondence_analysis(combined_file, selected_registers, analysis_
         df = pd.read_excel(combined_file, sheet_name=reg)
         df["Register"] = reg
         data_frames.append(df)
-
     combined_df = pd.concat(data_frames, ignore_index=True)
 
-    # Labels erstellen
+    # Analyse-Label
     if analysis_type == 'whole_process':
         combined_df["Analysis_Label"] = combined_df["Register"]
+    elif analysis_type == 'process_phases':
+        combined_df = combined_df.groupby(["Register", "Phase", "Code"]).size().reset_index(name='Count')
+        combined_df["Analysis_Label"] = combined_df.apply(lambda r: f"{r['Register']}\n-\n{r['Phase']}", axis=1)
     else:
         if len(selected_registers) == 1:
             combined_df["Analysis_Label"] = "Segment " + combined_df["Segment"].astype(str)
         else:
             combined_df["Analysis_Label"] = combined_df["Register"] + ": Segment " + combined_df["Segment"].astype(str)
 
-    # Kontingenztabelle
+    # Kontingenztabelle und SVD
     contingency_table = pd.crosstab(combined_df["Analysis_Label"], combined_df["Code"])
-
-    # Standardisieren + SVD
     X = StandardScaler().fit_transform(contingency_table)
     svd = TruncatedSVD(n_components=2)
     coords = svd.fit_transform(X)
@@ -91,116 +109,74 @@ def perform_correspondence_analysis(combined_file, selected_registers, analysis_
     row_coords = pd.DataFrame(coords, index=contingency_table.index, columns=['Dim1', 'Dim2'])
     col_coords = pd.DataFrame(svd.components_.T, index=contingency_table.columns, columns=['Dim1', 'Dim2'])
 
-    # Erklärte Varianz in Prozent
     explained_var = svd.explained_variance_ratio_ * 100
 
-    # Farben (mehr Farben für viele Register)
-    unique_registers = list(dict.fromkeys(combined_df["Register"]))
-    base_colors = ['blue', 'green', 'orange', 'purple', 'brown', 'red', 'pink', 'cyan', 'magenta', 'yellow']
-    color_map = {reg: base_colors[i % len(base_colors)] for i, reg in enumerate(unique_registers)}
+    # Plot
+    plt.figure(figsize=(14, 10))
+    ax = plt.gca()
+    ax.axhline(0, color='gray', linestyle='--', lw=0.8)
+    ax.axvline(0, color='gray', linestyle='--', lw=0.8)
+    ax.grid(True, linestyle='--', linewidth=0.5, alpha=0.6)
 
-    plt.figure(figsize=(12, 8))
+    # Punkte + Texte
+    texts = []
+    all_points = []
 
-    # === Analyse-Labels gruppieren nach gerundeten Koordinaten ===
-    coord_groups = defaultdict(list)
-    for label in row_coords.index:
-        x = round(row_coords.loc[label, 'Dim1'], 5)
-        y = round(row_coords.loc[label, 'Dim2'], 5)
-        coord_groups[(x, y)].append(label)
+    # Offset, damit Labels initial weiter weg vom Punkt sind
+    offset_x = 0.1
+    offset_y = 0.1
 
-    # Punkte und Beschriftungen der Analyse-Labels
-    for (x, y), labels in coord_groups.items():
-        # Bestimme Farbe nach Register des ersten Labels
-        first_label = labels[0]
-        if ":" in first_label:
-            reg = first_label.split(":")[0].strip()
-        else:
-            reg = combined_df[combined_df["Analysis_Label"] == first_label]["Register"].iloc[0]
+    # Labels direkt auf Punkt (x, y)
+    for code, row in col_coords.iterrows():
+        x, y = row['Dim1'], row['Dim2']
+        ax.scatter(x, y, color='red', s=15, zorder=2)
+        txt = ax.text(x, y, code, fontsize=12, color='red', linespacing=0.5,
+                      ha='center', va='center', zorder=4)
+        texts.append(txt)
+        all_points.append((x, y))
 
-        plt.scatter(x, y, color=color_map.get(reg, 'black'), s=50, marker='o')
+    for label, row in row_coords.iterrows():
+        x, y = row['Dim1'], row['Dim2']
+        ax.scatter(x, y, color='blue', s=20, zorder=3)
+        txt = ax.text(x, y, label, fontsize=11, color='blue', linespacing=0.5,
+                      ha='center', va='center', zorder=5)
+        texts.append(txt)
+        all_points.append((x, y))
 
-        # Wenn nur ein Label, normal beschriften
-        if len(labels) == 1:
-            # Beschriftung ohne „Segment“
-            import re
-            lab = labels[0]
-            new_label = re.sub(r'Segment\s*', '', lab)
-            plt.annotate(new_label,
-                         (x, y),
-                         fontsize=8,
-                         color=color_map.get(reg, 'black'),
-                         xytext=(5, 5),
-                         textcoords='offset points',
-                         ha='left', va='bottom')
-        else:
-            # Mehrere Labels: Segmentnummern extrahieren ohne "Segment" und prefix ohne Segmentnummer
-            segments = []
-            prefix = None
-            import re
-            for lab in labels:
-                m = re.search(r'Segment\s*(\d+)', lab)
-                if m:
-                    segments.append(m.group(1))
-                    prefix_candidate = lab[:m.start()].strip()
-                    if prefix is None:
-                        prefix = prefix_candidate
-                else:
-                    segments.append(lab)
-                    prefix = None
+    adjust_text(
+        texts,
+        expand_points=(150, 150),     # sehr großer Abstand zwischen Punkten und Texten
+        expand_text=(150, 150),       # sehr großer Abstand zwischen Texten
+        force_points=20,              # hohe Kraft, um Abstand zu wahren
+        force_text=20,                # hohe Kraft bei Text-Text Abstand
+        avoid_points=all_points,      # Punkte meiden
+        avoid_text=True,              # Texte meiden
+        only_move={'points': 'none', 'text': 'xy'},
+        arrowprops=dict(
+            arrowstyle='->',
+            color='gray',
+            lw=0.6,
+            shrinkA=0,
+            shrinkB=7,
+        ),
+        precision=0.0001,
+        lim=6000,                    # erlaube große Verschiebungen
+        autoalign='xy'
+    )
 
-            if prefix:
-                label_text = f"{prefix}: {','.join(segments)}"
-            else:
-                label_text = ",".join(segments)
 
-            plt.annotate(label_text,
-                         (x, y),
-                         fontsize=8,
-                         color=color_map.get(reg, 'black'),
-                         xytext=(5, 5),
-                         textcoords='offset points',
-                         ha='left', va='bottom')
+    # Achsentitel & Speichern
+    ax.set_title(f"Correspondence Analysis: {'Whole Processes' if analysis_type == 'whole_process' else 'Process Phases'}", fontsize=16)
+    ax.set_xlabel(f"Dim1 ({explained_var[0]:.1f}%)", fontsize=14)
+    ax.set_ylabel(f"Dim2 ({explained_var[1]:.1f}%)", fontsize=14)
 
-    # === Codes gruppieren ===
-    code_groups = defaultdict(list)
-    for code in col_coords.index:
-        x = round(col_coords.loc[code, 'Dim1'], 5)
-        y = round(col_coords.loc[code, 'Dim2'], 5)
-        code_groups[(x, y)].append(code)
-
-    # Punkte für Codes (rot) und Beschriftungen
-    for (x, y), codes in code_groups.items():
-        plt.scatter(x, y, color='red', marker='o', s=30)
-        label_text = ",".join(codes)
-        plt.annotate(label_text,
-                     (x, y),
-                     fontsize=10,
-                     color='red',
-                     xytext=(5, 5),
-                     textcoords='offset points',
-                     ha='left', va='bottom')
-
-    plt.axhline(0, color='gray', linestyle='--')
-    plt.axvline(0, color='gray', linestyle='--')
-
-    plt.title(f"Correspondence Analysis: {'Whole Processes' if analysis_type == 'whole_process' else 'Process Phases'}")
-    plt.xlabel(f"Dim1 ({explained_var[0]:.1f}%)")
-    plt.ylabel(f"Dim2 ({explained_var[1]:.1f}%)")
-
-    plt.legend(handles=[plt.Line2D([0], [0], marker='o', color='w', label=reg,
-                                   markerfacecolor=col, markersize=8)
-                        for reg, col in color_map.items()])
-    plt.grid(True)
-
-    # Speichern
     output_dir = os.path.join(os.path.dirname(__file__), 'static', 'diagrams')
     os.makedirs(output_dir, exist_ok=True)
-
     safe_name = "_".join([reg.replace(" ", "_") for reg in selected_registers])
     output_filename = f"correspondence_{safe_name}_{analysis_type}.png"
     output_path = os.path.join(output_dir, output_filename)
 
-    plt.savefig(output_path)
+    plt.savefig(output_path, bbox_inches='tight')
     plt.close()
 
     return output_filename
@@ -309,6 +285,15 @@ def perform_cumulative_occurence_analysis(df, sheet_name, filename_base, min_occ
     plt.tight_layout()
 
     output_path = os.path.join(diagram_folder, f"{filename_base}_{sheet_name}_cumulative.png")
+    # Plot-Limits erweitern, damit Labels am Rand nicht abgeschnitten werden
+    x_min, x_max = plt.xlim()
+    y_min, y_max = plt.ylim()
+
+    x_range = x_max - x_min
+    y_range = y_max - y_min
+
+    plt.xlim(x_min - 0.05 * x_range, x_max + 0.05 * x_range)
+    plt.ylim(y_min - 0.05 * y_range, y_max + 0.05 * y_range)
     plt.savefig(output_path)
     plt.close()
 
@@ -335,7 +320,6 @@ def perform_cumulative_occurence_analysis(df, sheet_name, filename_base, min_occ
 
 def curvature_threshold(max_segment):
     return max(0.0003, 0.008 - (max_segment / 1000))
-
 
 
 def perform_markov_chain_analysis(df, sheet_name, filename_base, threshold=0.0, action="generate"):
