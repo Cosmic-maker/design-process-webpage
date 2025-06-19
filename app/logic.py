@@ -7,11 +7,8 @@ import matplotlib.pyplot as plt
 import os
 import matplotlib
 from adjustText import adjust_text
-
+import prince
 matplotlib.use('Agg')
-import random
-from sklearn.decomposition import TruncatedSVD
-from sklearn.preprocessing import StandardScaler
 from matplotlib.ticker import MaxNLocator
 
 ALLOWED_CODES = {"R", "F", "Be", "Bs", "S", "D"}
@@ -67,12 +64,6 @@ def create_combined_excel(sheet_dict, output_path):
             df.to_excel(writer, sheet_name=sheet_name, index=False)
 
 def perform_correspondence_analysis(combined_file, selected_registers, analysis_type='process_phases'):
-    import matplotlib.pyplot as plt
-    import pandas as pd
-    from sklearn.preprocessing import StandardScaler
-    from sklearn.decomposition import TruncatedSVD
-    from adjustText import adjust_text
-    import os
 
     if not selected_registers:
         raise ValueError("No registers selected")
@@ -80,95 +71,104 @@ def perform_correspondence_analysis(combined_file, selected_registers, analysis_
     if analysis_type == 'whole_process' and len(selected_registers) < 2:
         raise ValueError("Whole process analysis requires at least 2 processes")
 
-    # Daten laden
+    # Daten einlesen
     data_frames = []
     for reg in selected_registers:
-        df = pd.read_excel(combined_file, sheet_name=reg)
+        df = pd.read_excel(combined_file, sheet_name=reg)  # Fehler beim Lesen lassen wir durchgehen
         df["Register"] = reg
         data_frames.append(df)
+
     combined_df = pd.concat(data_frames, ignore_index=True)
 
-    # Analyse-Label
+    # Labels setzen je Analyse-Typ
     if analysis_type == 'whole_process':
+        combined_df = combined_df.groupby(["Register", "Code"]).size().reset_index(name='Count')
         combined_df["Analysis_Label"] = combined_df["Register"]
     elif analysis_type == 'process_phases':
         combined_df = combined_df.groupby(["Register", "Phase", "Code"]).size().reset_index(name='Count')
         combined_df["Analysis_Label"] = combined_df.apply(lambda r: f"{r['Register']}\n-\n{r['Phase']}", axis=1)
     else:
         if len(selected_registers) == 1:
+            combined_df = combined_df.groupby(["Segment", "Code"]).size().reset_index(name='Count')
             combined_df["Analysis_Label"] = "Segment " + combined_df["Segment"].astype(str)
         else:
+            combined_df = combined_df.groupby(["Register", "Segment", "Code"]).size().reset_index(name='Count')
             combined_df["Analysis_Label"] = combined_df["Register"] + ": Segment " + combined_df["Segment"].astype(str)
 
-    # Kontingenztabelle und SVD
-    contingency_table = pd.crosstab(combined_df["Analysis_Label"], combined_df["Code"])
-    X = StandardScaler().fit_transform(contingency_table)
-    svd = TruncatedSVD(n_components=2)
-    coords = svd.fit_transform(X)
+    # Kontingenztabelle (Pivot)
+    contingency_table = combined_df.pivot_table(
+        index="Analysis_Label",
+        columns="Code",
+        values="Count",
+        aggfunc='sum',
+        fill_value=0
+    )
 
-    row_coords = pd.DataFrame(coords, index=contingency_table.index, columns=['Dim1', 'Dim2'])
-    col_coords = pd.DataFrame(svd.components_.T, index=contingency_table.columns, columns=['Dim1', 'Dim2'])
+    if contingency_table.shape[0] < 2 or contingency_table.shape[1] < 2:
+        raise RuntimeError("Not enough data for correspondence analysis (need at least 2 rows and 2 columns).")
 
-    explained_var = svd.explained_variance_ratio_ * 100
+    max_dim = min(contingency_table.shape[0] - 1, contingency_table.shape[1] - 1)
+    n_components = min(2, max_dim)
 
-    # Plot
+    ca = prince.CA(n_components=n_components, engine='fbpca', random_state=42)
+    ca = ca.fit(contingency_table)
+
+    row_coords = ca.row_coordinates(contingency_table)
+    col_coords = ca.column_coordinates(contingency_table)
+
+    eigenvalues = ca.eigenvalues_
+    total_inertia = sum(eigenvalues)
+    explained = [eig / total_inertia for eig in eigenvalues]
+
+    def get_coords(row):
+        x = row.iloc[0] if len(row) > 0 else 0
+        y = row.iloc[1] if len(row) > 1 else 0
+        return x, y
+
     plt.figure(figsize=(14, 10))
     ax = plt.gca()
     ax.axhline(0, color='gray', linestyle='--', lw=0.8)
     ax.axvline(0, color='gray', linestyle='--', lw=0.8)
     ax.grid(True, linestyle='--', linewidth=0.5, alpha=0.6)
 
-    # Punkte + Texte
     texts = []
     all_points = []
 
-    # Offset, damit Labels initial weiter weg vom Punkt sind
-    offset_x = 0.1
-    offset_y = 0.1
-
-    # Labels direkt auf Punkt (x, y)
     for code, row in col_coords.iterrows():
-        x, y = row['Dim1'], row['Dim2']
+        x, y = get_coords(row)
         ax.scatter(x, y, color='red', s=15, zorder=2)
-        txt = ax.text(x, y, code, fontsize=12, color='red', linespacing=0.5,
-                      ha='center', va='center', zorder=4)
+        txt = ax.text(x, y, code, fontsize=12, color='red', ha='center', va='center')
         texts.append(txt)
         all_points.append((x, y))
 
     for label, row in row_coords.iterrows():
-        x, y = row['Dim1'], row['Dim2']
+        x, y = get_coords(row)
         ax.scatter(x, y, color='blue', s=20, zorder=3)
-        txt = ax.text(x, y, label, fontsize=11, color='blue', linespacing=0.5,
-                      ha='center', va='center', zorder=5)
+        txt = ax.text(x, y, label, fontsize=11, color='blue', ha='center', va='center')
         texts.append(txt)
         all_points.append((x, y))
 
     adjust_text(
         texts,
-        expand_points=(150, 150),     # sehr großer Abstand zwischen Punkten und Texten
-        expand_text=(150, 150),       # sehr großer Abstand zwischen Texten
-        force_points=20,              # hohe Kraft, um Abstand zu wahren
-        force_text=20,                # hohe Kraft bei Text-Text Abstand
-        avoid_points=all_points,      # Punkte meiden
-        avoid_text=True,              # Texte meiden
+        expand_points=(150, 150),
+        expand_text=(150, 150),
+        force_points=20,
+        force_text=20,
+        avoid_points=all_points,
+        avoid_text=True,
         only_move={'points': 'none', 'text': 'xy'},
-        arrowprops=dict(
-            arrowstyle='->',
-            color='gray',
-            lw=0.6,
-            shrinkA=0,
-            shrinkB=7,
-        ),
+        arrowprops=dict(arrowstyle='->', color='gray', lw=0.6, shrinkA=0, shrinkB=7),
         precision=0.0001,
-        lim=6000,                    # erlaube große Verschiebungen
+        lim=6000,
         autoalign='xy'
     )
 
-
-    # Achsentitel & Speichern
     ax.set_title(f"Correspondence Analysis: {'Whole Processes' if analysis_type == 'whole_process' else 'Process Phases'}", fontsize=16)
-    ax.set_xlabel(f"Dim1 ({explained_var[0]:.1f}%)", fontsize=14)
-    ax.set_ylabel(f"Dim2 ({explained_var[1]:.1f}%)", fontsize=14)
+    ax.set_xlabel(f"Dim1 ({explained[0]*100:.1f}%)", fontsize=14)
+    if len(explained) > 1:
+        ax.set_ylabel(f"Dim2 ({explained[1]*100:.1f}%)", fontsize=14)
+    else:
+        ax.set_ylabel("Dim2 (not available)", fontsize=14)
 
     output_dir = os.path.join(os.path.dirname(__file__), 'static', 'diagrams')
     os.makedirs(output_dir, exist_ok=True)
