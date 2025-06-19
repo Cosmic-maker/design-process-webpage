@@ -91,10 +91,10 @@ input[type="file"] {
 }
 
 .custom-file-upload {
-    padding: 0.8rem 1.8rem;       /* etwas kleiner */
+    padding: 0.8rem 1.8rem;
     font-size: 1.1rem;
-    color: white;                 /* weiße Schrift */
-    background-color: #6A5ACD;    /* lila Hintergrund wie andere Buttons */
+    color: white;
+    background-color: #6A5ACD;
     border: none;
     border-radius: 10px;
     cursor: pointer;
@@ -106,7 +106,7 @@ input[type="file"] {
 }
 
 .custom-file-upload:hover {
-    background-color: #5a4fcf;    /* dunkleres Lila beim Hover */
+    background-color: #5a4fcf;
     transform: translateY(-3px);
     box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
 }
