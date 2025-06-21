@@ -64,23 +64,20 @@ def create_combined_excel(sheet_dict, output_path):
             df.to_excel(writer, sheet_name=sheet_name, index=False)
 
 def perform_correspondence_analysis(combined_file, selected_registers, analysis_type='process_phases'):
-
     if not selected_registers:
         raise ValueError("No registers selected")
 
     if analysis_type == 'whole_process' and len(selected_registers) < 2:
         raise ValueError("Whole process analysis requires at least 2 processes")
 
-    # Daten einlesen
     data_frames = []
     for reg in selected_registers:
-        df = pd.read_excel(combined_file, sheet_name=reg)  # Fehler beim Lesen lassen wir durchgehen
+        df = pd.read_excel(combined_file, sheet_name=reg)
         df["Register"] = reg
         data_frames.append(df)
 
     combined_df = pd.concat(data_frames, ignore_index=True)
 
-    # Labels setzen je Analyse-Typ
     if analysis_type == 'whole_process':
         combined_df = combined_df.groupby(["Register", "Code"]).size().reset_index(name='Count')
         combined_df["Analysis_Label"] = combined_df["Register"]
@@ -95,7 +92,6 @@ def perform_correspondence_analysis(combined_file, selected_registers, analysis_
             combined_df = combined_df.groupby(["Register", "Segment", "Code"]).size().reset_index(name='Count')
             combined_df["Analysis_Label"] = combined_df["Register"] + ": Segment " + combined_df["Segment"].astype(str)
 
-    # Kontingenztabelle (Pivot)
     contingency_table = combined_df.pivot_table(
         index="Analysis_Label",
         columns="Code",
@@ -125,50 +121,60 @@ def perform_correspondence_analysis(combined_file, selected_registers, analysis_
         y = row.iloc[1] if len(row) > 1 else 0
         return x, y
 
-    plt.figure(figsize=(14, 10))
+    # Plot setup
+    plt.rcParams.update({
+        'font.size': 11,
+        'font.family': 'sans-serif'
+    })
+
+    plt.figure(figsize=(12, 9))
     ax = plt.gca()
     ax.axhline(0, color='gray', linestyle='--', lw=0.8)
     ax.axvline(0, color='gray', linestyle='--', lw=0.8)
-    ax.grid(True, linestyle='--', linewidth=0.5, alpha=0.6)
+    ax.grid(True, linestyle='--', linewidth=0.4, alpha=0.5)
+    ax.set_aspect('equal', adjustable='datalim')
 
     texts = []
     all_points = []
 
+    # Spalten (Design Issues) – rote Dreiecke
     for code, row in col_coords.iterrows():
         x, y = get_coords(row)
-        ax.scatter(x, y, color='red', s=15, zorder=2)
+        ax.scatter(x, y, color='red', s=10, marker='^', zorder=2)
         txt = ax.text(x, y, code, fontsize=12, color='red', ha='center', va='center')
         texts.append(txt)
         all_points.append((x, y))
 
+    # Zeilen (Modelle) – blaue Punkte
     for label, row in row_coords.iterrows():
         x, y = get_coords(row)
-        ax.scatter(x, y, color='blue', s=20, zorder=3)
-        txt = ax.text(x, y, label, fontsize=11, color='blue', ha='center', va='center')
+        ax.scatter(x, y, color='blue', s=10, marker='o', zorder=3)
+        txt = ax.text(x, y, label, fontsize=11, color='blue', ha='center', va='center', linespacing=0.5 )
         texts.append(txt)
         all_points.append((x, y))
 
+    # Text-Anpassung mit Pfeilen
     adjust_text(
         texts,
-        expand_points=(150, 150),
-        expand_text=(150, 150),
-        force_points=20,
-        force_text=20,
+        expand_points=(1.4, 1.4),
+        expand_text=(1.4, 1.4),
+        force_points=0.3,
+        force_text=0.5,
         avoid_points=all_points,
         avoid_text=True,
         only_move={'points': 'none', 'text': 'xy'},
-        arrowprops=dict(arrowstyle='->', color='gray', lw=0.6, shrinkA=0, shrinkB=7),
+        arrowprops=dict(arrowstyle='->', color='gray', lw=0.6, shrinkA=0, shrinkB=5),
         precision=0.0001,
-        lim=6000,
+        lim=5000,
         autoalign='xy'
     )
 
-    ax.set_title(f"Correspondence Analysis: {'Whole Processes' if analysis_type == 'whole_process' else 'Process Phases'}", fontsize=16)
-    ax.set_xlabel(f"Dim1 ({explained[0]*100:.1f}%)", fontsize=14)
+    ax.set_title(f"Correspondence Analysis: {'Whole Processes' if analysis_type == 'whole_process' else 'Process Phases'}", fontsize=15)
+    ax.set_xlabel(f"Dim1 ({explained[0]*100:.1f}%)", fontsize=13)
     if len(explained) > 1:
-        ax.set_ylabel(f"Dim2 ({explained[1]*100:.1f}%)", fontsize=14)
+        ax.set_ylabel(f"Dim2 ({explained[1]*100:.1f}%)", fontsize=13)
     else:
-        ax.set_ylabel("Dim2 (not available)", fontsize=14)
+        ax.set_ylabel("Dim2 (not available)", fontsize=13)
 
     output_dir = os.path.join(os.path.dirname(__file__), 'static', 'diagrams')
     os.makedirs(output_dir, exist_ok=True)
@@ -180,6 +186,7 @@ def perform_correspondence_analysis(combined_file, selected_registers, analysis_
     plt.close()
 
     return output_filename
+
 
 def perform_cumulative_occurence_analysis(df, sheet_name, filename_base, min_occurrences_char, min_occurrences_slope, fbs_threshold):
     diagram_folder = os.path.join("app", "static", "diagrams", "cumulative_occurrence_analysis")
