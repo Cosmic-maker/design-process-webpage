@@ -6,10 +6,10 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import os
 import matplotlib
-from adjustText import adjust_text
 import prince
 matplotlib.use('Agg')
 from matplotlib.ticker import MaxNLocator
+from adjustText import adjust_text
 
 ALLOWED_CODES = {"R", "F", "Be", "Bs", "S", "D"}
 DIAGRAM_FOLDER = os.path.join("app", "static", "diagrams")
@@ -62,14 +62,9 @@ def create_combined_excel(sheet_dict, output_path):
     with pd.ExcelWriter(output_path, engine='openpyxl', mode='a' if file_exists else 'w') as writer:
         for sheet_name, df in sheet_dict.items():
             df.to_excel(writer, sheet_name=sheet_name, index=False)
-import os
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-from adjustText import adjust_text
-import prince
 
 def perform_correspondence_analysis(combined_file, selected_registers, analysis_type='process_phases'):
+
     if not selected_registers:
         raise ValueError("No registers selected")
 
@@ -104,7 +99,6 @@ def perform_correspondence_analysis(combined_file, selected_registers, analysis_
             fill_value=0
         )
     else:
-        # Beispiel Segmentanalyse
         if len(selected_registers) == 1:
             grouped = combined_df.groupby(["Segment", "Code"]).size().reset_index(name='Count')
             grouped["Analysis_Label"] = "Segment " + grouped["Segment"].astype(str)
@@ -161,9 +155,18 @@ def perform_correspondence_analysis(combined_file, selected_registers, analysis_
             df_mirror.iloc[:, 1] = -df_mirror.iloc[:, 1]
         return df_mirror
 
-    # Spiegelung an beiden Achsen aktivieren, wie in R/RGui üblich
-    row_coords = mirror_coords(row_coords, mirror_x=True, mirror_y=True)
-    col_coords = mirror_coords(col_coords, mirror_x=True, mirror_y=True)
+    # Spiegelung abhängig vom Analyse-Typ
+    if analysis_type == 'whole_process':
+        # Y-Achse spiegeln
+        row_coords = mirror_coords(row_coords, mirror_x=False, mirror_y=True)
+        col_coords = mirror_coords(col_coords, mirror_x=False, mirror_y=True)
+    elif analysis_type == 'process_phases':
+        # X-Achse spiegeln
+        row_coords = mirror_coords(row_coords, mirror_x=True, mirror_y=False)
+        col_coords = mirror_coords(col_coords, mirror_x=True, mirror_y=False)
+    else:
+        # Keine Spiegelung
+        pass
 
     total_inertia = (singular_values**2).sum()
     explained = [(sv**2) / total_inertia for sv in singular_values]
@@ -238,7 +241,6 @@ def perform_correspondence_analysis(combined_file, selected_registers, analysis_
     plt.close()
 
     return output_filename
-
 
 def perform_cumulative_occurence_analysis(df, sheet_name, filename_base, min_occurrences_char, min_occurrences_slope, fbs_threshold):
     diagram_folder = os.path.join("app", "static", "diagrams", "cumulative_occurrence_analysis")
