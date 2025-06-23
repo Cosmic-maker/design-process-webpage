@@ -234,19 +234,32 @@ def perform_cumulative_occurence_analysis(df, sheet_name, filename_base, min_occ
             x_extended = np.append(x_extended, max_segment)
             y_extended = np.append(y_extended, y_extended[-1])
 
-        # Charakterisierung (mit erweiterten Punkten)
+        # Charakterisierung: linear / convex / concave
         if len(x_extended) >= min_occurrences_char:
             try:
-                a, b, c = np.polyfit(x_extended, y_extended, deg=2)
-                threshold = curvature_threshold(max_segment)
-                if abs(a) < threshold:
+                lin_coeffs = np.polyfit(x_extended, y_extended, 1)
+                lin_fit = np.polyval(lin_coeffs, x_extended)
+                sse_lin = np.sum((y_extended - lin_fit) ** 2)
+
+                quad_coeffs = np.polyfit(x_extended, y_extended, 2)
+                quad_fit = np.polyval(quad_coeffs, x_extended)
+                sse_quad = np.sum((y_extended - quad_fit) ** 2)
+
+                sst = np.sum((y_extended - np.mean(y_extended)) ** 2)
+
+                if sst == 0:
                     curvature_type = "linear"
-                elif a > 0:
-                    curvature_type = "convex"
                 else:
-                    curvature_type = "concave"
+                    r2_lin = 1 - (sse_lin / sst)
+                    r2_quad = 1 - (sse_quad / sst)
+                    improvement = r2_quad - r2_lin
+
+                    if improvement < 0.05:
+                        curvature_type = "linear"
+                    else:
+                        curvature_type = "convex" if quad_coeffs[0] > 0 else "concave"
             except Exception as e:
-                print(f"Fehler bei der Charakterisierung für Code {code}: {e}")
+                print(f"Fehler bei Charakterisierung Code {code}: {e}")
                 curvature_type = "n.A."
         else:
             curvature_type = "n.A."
@@ -291,7 +304,7 @@ def perform_cumulative_occurence_analysis(df, sheet_name, filename_base, min_occ
     plt.grid(True)
     plt.tight_layout()
 
-    output_path = os.path.join(diagram_folder, f"{filename_base}_{sheet_name}_cumulative.png")
+    output_path = os.path.join(diagram_folder, f"{sheet_name}_cumulative.png")
     # Plot-Limits erweitern, damit Labels am Rand nicht abgeschnitten werden
     x_min, x_max = plt.xlim()
     y_min, y_max = plt.ylim()
@@ -317,17 +330,13 @@ def perform_cumulative_occurence_analysis(df, sheet_name, filename_base, min_occ
     plt.ylabel("Slope")
     plt.grid(axis='y')
     plt.tight_layout()
-    plt.savefig(os.path.join(diagram_folder, f"{filename_base}_{sheet_name}_slopes.png"))
+    plt.savefig(os.path.join(diagram_folder, f"{sheet_name}_slopes.png"))
     plt.close()
 
     return {
         "fbs_results": fbs_results,
         "characterizations": characterizations,
     }
-
-def curvature_threshold(max_segment):
-    return max(0.0003, 0.008 - (max_segment / 1000))
-
 
 def perform_markov_chain_analysis(df, sheet_name, filename_base, threshold=0.0, action="generate"):
     codes = df["Code"].astype(str).tolist()
