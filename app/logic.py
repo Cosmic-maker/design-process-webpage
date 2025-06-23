@@ -62,14 +62,18 @@ def create_combined_excel(sheet_dict, output_path):
     with pd.ExcelWriter(output_path, engine='openpyxl', mode='a' if file_exists else 'w') as writer:
         for sheet_name, df in sheet_dict.items():
             df.to_excel(writer, sheet_name=sheet_name, index=False)
+import os
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from adjustText import adjust_text
+import prince
 
 def perform_correspondence_analysis(combined_file, selected_registers, analysis_type='process_phases'):
     if not selected_registers:
         raise ValueError("No registers selected")
 
-    if analysis_type == 'whole_process' and len(selected_registers) < 2:
-        raise ValueError("Whole process analysis requires at least 2 processes")
-
+    # Daten aus Excel-Sheets laden und zusammenführen
     data_frames = []
     for reg in selected_registers:
         df = pd.read_excel(combined_file, sheet_name=reg)
@@ -78,50 +82,98 @@ def perform_correspondence_analysis(combined_file, selected_registers, analysis_
 
     combined_df = pd.concat(data_frames, ignore_index=True)
 
+    # Kontingenztabelle erstellen je nach Analyse-Typ
     if analysis_type == 'whole_process':
-        combined_df = combined_df.groupby(["Register", "Code"]).size().reset_index(name='Count')
-        combined_df["Analysis_Label"] = combined_df["Register"]
+        grouped = combined_df.groupby(["Register", "Code"]).size().reset_index(name='Count')
+        grouped["Analysis_Label"] = grouped["Register"]
+        contingency_table = grouped.pivot_table(
+            index="Analysis_Label",
+            columns="Code",
+            values="Count",
+            aggfunc='sum',
+            fill_value=0
+        )
     elif analysis_type == 'process_phases':
-        combined_df = combined_df.groupby(["Register", "Phase", "Code"]).size().reset_index(name='Count')
-        combined_df["Analysis_Label"] = combined_df.apply(lambda r: f"{r['Register']}\n-\n{r['Phase']}", axis=1)
+        grouped = combined_df.groupby(["Register", "Phase", "Code"]).size().reset_index(name='Count')
+        grouped["Analysis_Label"] = grouped.apply(lambda r: f"{r['Register']}\n-\n{r['Phase']}", axis=1)
+        contingency_table = grouped.pivot_table(
+            index="Analysis_Label",
+            columns="Code",
+            values="Count",
+            aggfunc='sum',
+            fill_value=0
+        )
     else:
+        # Beispiel Segmentanalyse
         if len(selected_registers) == 1:
-            combined_df = combined_df.groupby(["Segment", "Code"]).size().reset_index(name='Count')
-            combined_df["Analysis_Label"] = "Segment " + combined_df["Segment"].astype(str)
+            grouped = combined_df.groupby(["Segment", "Code"]).size().reset_index(name='Count')
+            grouped["Analysis_Label"] = "Segment " + grouped["Segment"].astype(str)
         else:
-            combined_df = combined_df.groupby(["Register", "Segment", "Code"]).size().reset_index(name='Count')
-            combined_df["Analysis_Label"] = combined_df["Register"] + ": Segment " + combined_df["Segment"].astype(str)
+            grouped = combined_df.groupby(["Register", "Segment", "Code"]).size().reset_index(name='Count')
+            grouped["Analysis_Label"] = grouped["Register"] + ": Segment " + grouped["Segment"].astype(str)
 
-    contingency_table = combined_df.pivot_table(
-        index="Analysis_Label",
-        columns="Code",
-        values="Count",
-        aggfunc='sum',
-        fill_value=0
-    )
+        contingency_table = grouped.pivot_table(
+            index="Analysis_Label",
+            columns="Code",
+            values="Count",
+            aggfunc='sum',
+            fill_value=0
+        )
 
     if contingency_table.shape[0] < 2 or contingency_table.shape[1] < 2:
         raise RuntimeError("Not enough data for correspondence analysis (need at least 2 rows and 2 columns).")
 
-    max_dim = min(contingency_table.shape[0] - 1, contingency_table.shape[1] - 1)
-    n_components = min(2, max_dim)
+    # CA manuell mit SVD berechnen (wie in R)
+    N = contingency_table.values
+    grand_total = N.sum()
+    P = N / grand_total  # relative Häufigkeiten
 
-    ca = prince.CA(n_components=n_components, engine='fbpca', random_state=42)
-    ca = ca.fit(contingency_table)
+    row_margins = P.sum(axis=1)
+    col_margins = P.sum(axis=0)
 
-    row_coords = ca.row_coordinates(contingency_table)
-    col_coords = ca.column_coordinates(contingency_table)
+    E = np.outer(row_margins, col_margins)  # Erwartete Wahrscheinlichkeiten
+    S = (P - E) / np.sqrt(E)  # standardisierte Residuen
 
-    eigenvalues = ca.eigenvalues_
-    total_inertia = sum(eigenvalues)
-    explained = [eig / total_inertia for eig in eigenvalues]
+    U, singular_values, VT = np.linalg.svd(S, full_matrices=False)
+
+    k = min(2, len(singular_values))  # 2 Dimensionen maximal
+
+    U_k = U[:, :k]
+    V_k = VT.T[:, :k]
+    Lambda = np.diag(singular_values[:k])
+
+    Dr_inv_sqrt = np.diag(1 / np.sqrt(row_margins))
+    Dc_inv_sqrt = np.diag(1 / np.sqrt(col_margins))
+
+    # R-typische Koordinaten
+    row_coords = Dr_inv_sqrt @ U_k @ Lambda
+    col_coords = Dc_inv_sqrt @ V_k @ Lambda
+
+    row_coords = pd.DataFrame(row_coords, index=contingency_table.index, columns=[f"Dim{i+1}" for i in range(k)])
+    col_coords = pd.DataFrame(col_coords, index=contingency_table.columns, columns=[f"Dim{i+1}" for i in range(k)])
+
+    # Spiegel-Funktion für x- und y-Achse
+    def mirror_coords(df, mirror_x=False, mirror_y=False):
+        df_mirror = df.copy()
+        if mirror_x:
+            df_mirror.iloc[:, 0] = -df_mirror.iloc[:, 0]
+        if mirror_y:
+            df_mirror.iloc[:, 1] = -df_mirror.iloc[:, 1]
+        return df_mirror
+
+    # Spiegelung an beiden Achsen aktivieren, wie in R/RGui üblich
+    row_coords = mirror_coords(row_coords, mirror_x=True, mirror_y=True)
+    col_coords = mirror_coords(col_coords, mirror_x=True, mirror_y=True)
+
+    total_inertia = (singular_values**2).sum()
+    explained = [(sv**2) / total_inertia for sv in singular_values]
 
     def get_coords(row):
         x = row.iloc[0] if len(row) > 0 else 0
         y = row.iloc[1] if len(row) > 1 else 0
         return x, y
 
-    # Plot setup
+    # Plot-Setup
     plt.rcParams.update({
         'font.size': 11,
         'font.family': 'sans-serif'
@@ -137,7 +189,7 @@ def perform_correspondence_analysis(combined_file, selected_registers, analysis_
     texts = []
     all_points = []
 
-    # Spalten (Design Issues) – rote Dreiecke
+    # Spalten (Codes) – rote Dreiecke
     for code, row in col_coords.iterrows():
         x, y = get_coords(row)
         ax.scatter(x, y, color='red', s=10, marker='^', zorder=2)
@@ -145,11 +197,11 @@ def perform_correspondence_analysis(combined_file, selected_registers, analysis_
         texts.append(txt)
         all_points.append((x, y))
 
-    # Zeilen (Modelle) – blaue Punkte
+    # Zeilen (Labels) – blaue Punkte
     for label, row in row_coords.iterrows():
         x, y = get_coords(row)
         ax.scatter(x, y, color='blue', s=10, marker='o', zorder=3)
-        txt = ax.text(x, y, label, fontsize=11, color='blue', ha='center', va='center', linespacing=0.5 )
+        txt = ax.text(x, y, label, fontsize=11, color='blue', ha='center', va='center', linespacing=0.5)
         texts.append(txt)
         all_points.append((x, y))
 
