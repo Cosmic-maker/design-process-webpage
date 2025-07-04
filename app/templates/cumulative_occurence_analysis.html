@@ -12,6 +12,28 @@
             padding: 0 20px;
             box-sizing: border-box;
         }
+
+        .home-button {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+        }
+
+        .home-button a {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 42px;
+            height: 42px;
+            background-color: #7B68EE;
+            border-radius: 8px;
+            transition: background-color 0.3s ease;
+        }
+
+        .home-button a:hover {
+            background-color: #6A5ACD;
+        }
+
         h1 {
             text-align: center;
             margin-top: 40px;
@@ -48,7 +70,22 @@
             padding: 8px;
             text-align: center;
         }
-        label, input, select, button {
+        /* Labels */
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 500;
+            color: #333;
+        }
+
+        /* Select-Elemente */
+        select {
+            width: 100%;
+            max-width: 300px;
+            margin-bottom: 15px;
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
             font-size: 1rem;
         }
     </style>
@@ -56,7 +93,13 @@
 <body>
 
 <div class="container">
-
+    <div class="home-button">
+        <a href="{{ url_for('index') }}" title="Zur Startseite">
+            <svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" viewBox="0 -960 960 960" fill="white">
+                <path d="M240-200h120v-240h240v240h120v-360L480-740 240-560v360Zm-80 80v-480l320-240 320 240v480H520v-240h-80v240H160Zm320-350Z"/>
+            </svg>
+        </a>
+    </div>
     <h1>Cumulative Occurrence Analysis</h1>
     <div style="max-width:700px; margin: 40px auto 60px auto; padding: 25px 30px; border: 2px solid #7B68EE; border-radius: 12px; background-color: #EDEBFF; box-shadow: 0 6px 15px rgba(123, 104, 238, 0.3);">
         <form method="POST" action="/cumulative_occurence_analysis">

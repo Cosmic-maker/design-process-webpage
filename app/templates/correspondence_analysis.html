@@ -13,6 +13,28 @@
             padding: 0 20px;
             box-sizing: border-box;
         }
+
+        .home-button {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+        }
+
+        .home-button a {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 42px;
+            height: 42px;
+            background-color: #7B68EE;
+            border-radius: 8px;
+            transition: background-color 0.3s ease;
+        }
+
+        .home-button a:hover {
+            background-color: #6A5ACD;
+        }
+
         /* Überschrift zentriert */
         h1 {
             text-align: center;
@@ -29,6 +51,7 @@
             background-color: #EDEBFF;
             box-shadow: 0 6px 15px rgba(123, 104, 238, 0.3);
         }
+
         /* Labels */
         label {
             display: block;
@@ -46,6 +69,7 @@
             border: 1px solid #ccc;
             font-size: 1rem;
         }
+
         /* Hinweistext */
         p small {
             font-style: italic;
@@ -126,8 +150,14 @@
 <body>
 
 <div class="container">
+    <div class="home-button">
+        <a href="{{ url_for('index') }}" title="Zur Startseite">
+            <svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" viewBox="0 -960 960 960" fill="white">
+                <path d="M240-200h120v-240h240v240h120v-360L480-740 240-560v360Zm-80 80v-480l320-240 320 240v480H520v-240h-80v240H160Zm320-350Z"/>
+            </svg>
+        </a>
+    </div>
     <h1>Correspondence Analysis</h1>
-
     <div class="form-container">
         <form method="POST" id="main-form">
             <div>
@@ -142,10 +172,10 @@
             <div style="margin-top: 15px;">
                 <label for="analysis_type"><strong>Analysis Type:</strong></label>
                 <select name="analysis_type" id="analysis_type">
-                    <option value="process_phases" {% if analysis_type == 'process_phases' %}selected{% endif %}>
+                    <option value="process_phases" {% if analysis_type =='process_phases' %}selected{% endif %}>
                     Process Phases Analysis
                     </option>
-                    <option value="whole_process" {% if analysis_type == 'whole_process' %}selected{% endif %}>
+                    <option value="whole_process" {% if analysis_type =='whole_process' %}selected{% endif %}>
                     Whole Process Analysis (requires ≥2 processes)
                     </option>
                 </select>
